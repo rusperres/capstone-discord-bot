@@ -24,33 +24,52 @@ src/main/java/org/example/
     ├── Ticket.java              #
     └── User.java                #
 
-
+JAZ
 ### **DatabaseManager.java**
-* `getConnection()`
-* `initialize()`
-* `close()`
+* **`getConnection()`**: Returns the active connection to the SQLite database.
+* **`initialize()`**: Creates the `.db` file and runs `CREATE TABLE` scripts.
+* **`close()`**: Safely shuts down the connection pool when the bot stops.
 
 ---
 
 ### **TicketRepository.java**
 
 **Ticket CRUD**
-* `saveTicket(Ticket ticket)`
-* `updateTicketStatus(long threadId, String status)`
-* `findTicketByThreadId(long threadId)`
-* `isFileNameLoaded(String fileName)`
-* `getAllActiveTickets()`
-* `setPrUrl(long threadId, String url)`
+* **`saveTicket(Ticket ticket)`**: Inserts a new ticket record into the `tickets` table.
+* **`updateTicketStatus(long threadId, String status)`**: Changes a ticket's state (e.g., OPEN to CLAIMED).
+* **`findTicketByThreadId(long threadId)`**: Retrieves a full ticket row as a `Ticket` object.
+* **`isFileNameLoaded(String fileName)`**: Checks if a specific `.md` file has already been imported.
+* **`getAllActiveTickets()`**: Returns a list of all tickets that aren't marked as CLOSED.
+* **`setPrUrl(long threadId, String url)`**: Stores the GitHub/GitLab link for a resolved ticket.
 
 **User & Score Logic**
-* `upsertUser(long userId, String role)`
-* `getUser(long userId)`
-* `incrementDevScore(long userId)`
-* `decrementDevScore(long userId)`
-* `incrementQaScore(long userId)`
-* `decrementQaScore(long userId)`
-* `getLeaderboard(String type, int limit)`
+* **`upsertUser(long userId, String role)`**: Creates a user or updates their role (PM/Dev/QA).
+* **`getUser(long userId)`**: Fetches a user's role and current points from the `users` table.
+* **`incrementDevScore(long userId)`**: Adds +1 to the developer's completed tickets count.
+* **`decrementDevScore(long userId)`**: Removes 1 point if a resolution is reverted.
+* **`incrementQaScore(long userId)`**: Adds +1 to the QA's reviewed tickets count.
+* **`decrementQaScore(long userId)`**: Removes 1 point if a review is cancelled.
+* **`getLeaderboard(String type, int limit)`**: Returns the top N users sorted by their specific score type.
 
 **System Settings**
-* `saveSetting(String key, String value)`
-* `getSetting(String key)`
+* **`saveSetting(String key, String value)`**: Stores bot-wide config (e.g., "reminders_channel_id").
+* **`getSetting(String key)`**: Retrieves a stored config value by its key name.
+
+
+JAMES
+
+### **TicketController.java**
+* **`claimTicket(long ticketId, long userId)`**: Endpoint for the frontend to assign a specific user to a ticket.
+* **`resolveTicket(long ticketId, String prUrl)`**: Endpoint to submit a ticket for review with a pull request link.
+* **`getTicketStatus(long ticketId)`**: Fetches the current state and assigned developer for a specific ticket.
+* **`listAllTickets()`**: Returns a JSON list of all tickets in the system for the web dashboard.
+* **`closeTicket(long ticketId)`**: Finalizes a ticket, marking it as inactive and preventing further edits.
+
+---
+
+### **UserController.java**
+* **`getUserProfile(long userId)`**: Returns a user’s role, stats, and contribution history.
+* **`updateUserRole(long userId, String newRole)`**: Allows the frontend to change a user's permissions (PM/Dev/QA).
+* **`getLeaderboard(String type)`**: Returns a sorted list of users based on completed Dev or QA tasks.
+* **`validateUser(long userId)`**: Checks if a specific ID exists and has the required permissions to access the dashboard.
+* **`getUserStats(long userId)`**: Provides a summary of total resolved and reviewed tickets for a specific user.
