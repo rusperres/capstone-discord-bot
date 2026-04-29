@@ -1,0 +1,56 @@
+src/main/java/org/example/
+│
+├── Main.java                        # Bot entry point & JDA initialization - done
+├── BotConfig.java                   # Configuration and Env variable loader - done
+├── api/                             # REST Layer - James
+│   ├── TicketController.java        # Endpoint: POST /api/tickets/claim
+│   └── UserController.java
+├── commands/                        # DISCORD Layer - done
+│   ├── CommandManager.java          # Priority 4: Orchestration
+│   ├── GeneralCommands.java         # Priority 1: Core Identity
+│   ├── AdminCommands.java           # Priority 2: System Setup
+│   ├── DevCommands.java             # Priority 3: Development Workflow
+│   └── QACommands.java              # Priority 3: QA Workflow
+│
+├── database/                        # Database logic - Jaz
+│   ├── DatabaseManager.java         # Connection setup
+│   └── TicketRepository.java        # CRUD methods for tickets/scores in the database
+│
+├── services/                    # CORE BUSINESS LOGIC  - Jairus
+│   ├── TicketService.java       # logic for claim(), resolve(), review()
+│   ├── UserService.java         # logic for setRole(), getLeaderboard()
+│   └── TicketLoader.java        # Logic for file I/O
+└── models/                      # Data Objects - Jaz
+    ├── Ticket.java              #
+    └── User.java                #
+
+
+### **DatabaseManager.java**
+* `getConnection()`
+* `initialize()`
+* `close()`
+
+---
+
+### **TicketRepository.java**
+
+**Ticket CRUD**
+* `saveTicket(Ticket ticket)`
+* `updateTicketStatus(long threadId, String status)`
+* `findTicketByThreadId(long threadId)`
+* `isFileNameLoaded(String fileName)`
+* `getAllActiveTickets()`
+* `setPrUrl(long threadId, String url)`
+
+**User & Score Logic**
+* `upsertUser(long userId, String role)`
+* `getUser(long userId)`
+* `incrementDevScore(long userId)`
+* `decrementDevScore(long userId)`
+* `incrementQaScore(long userId)`
+* `decrementQaScore(long userId)`
+* `getLeaderboard(String type, int limit)`
+
+**System Settings**
+* `saveSetting(String key, String value)`
+* `getSetting(String key)`
