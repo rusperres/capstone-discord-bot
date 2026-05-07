@@ -19,6 +19,21 @@ public class Ticket {
         this.prUrl = prUrl;
         this.claimedBy = claimedBy;
         this.closedBy = closedBy;
+
+        validateStatus();
+    }
+
+    private void validateStatus(){
+        switch (this.status){
+            case "OPEN" -> {}
+            case "IN_PROGRESS" -> {}
+            case "IN_REVIEW" -> {}
+            case "RESOLVED" -> {}
+            case "CLOSED" -> {}
+            default -> {
+                status = "OPEN";
+            }
+        }
     }
 
     // Getters

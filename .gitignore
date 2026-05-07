@@ -4,6 +4,10 @@ target/
 !**/src/test/**/target/
 .kotlin
 
+tickets/*
+database.db
+.env
+
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml
