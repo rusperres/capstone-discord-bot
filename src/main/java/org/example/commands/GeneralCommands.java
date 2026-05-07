@@ -1,5 +1,9 @@
 package org.example.commands;
 
+import org.example.database.Classes.LeaderboardEntry;
+import org.example.services.TicketService;
+import org.example.services.UserService;
+
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.Member;
@@ -12,9 +16,11 @@ import java.util.List;
 
 public class GeneralCommands {
     private final TicketService ticketService;
+    private final UserService userService;
 
-    public GeneralCommands(TicketService ticketService){
+    public GeneralCommands(TicketService ticketService, UserService userService){
         this.ticketService = ticketService;
+        this.userService = userService;
     }
 
     public void handleSetRole(SlashCommandInteractionEvent event){
@@ -36,7 +42,7 @@ public class GeneralCommands {
                 .orElse(null);
         if(newRole != null){
             event.getGuild().addRoleToMember(member, newRole).queue();
-            ticketService.setUserRole(member.getIdLong(), roleName);
+            userService.setUserRole(member.getIdLong(), roleName);
             event.getHook().sendMessage("✅ Role set to " + roleName).queue();
         } else {
             event.getHook().sendMessage("❌ Role " + roleName + " not found in server.").queue();
@@ -45,7 +51,7 @@ public class GeneralCommands {
 
     public void handleLeaderboard(SlashCommandInteractionEvent event) {
         String type = event.getOption("type").getAsString();
-        List<LeaderboardEntry> stats = ticketService.getLeaderboard(type);
+        List<org.example.database.Classes.LeaderboardEntry> stats = userService.getLeaderboard(type);
 
         EmbedBuilder eb = new EmbedBuilder()
                 .setTitle("🏆 " + type.toUpperCase() + " Leaderboard")

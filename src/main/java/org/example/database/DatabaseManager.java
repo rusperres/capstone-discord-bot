@@ -81,11 +81,28 @@ public class DatabaseManager {
             );
             """;
 
+        // 5. Loaded Files Tracker
+        String createLoadedFilesTable = """
+                CREATE TABLE IF NOT EXISTS loaded_files (
+                    file_name TEXT PRIMARY KEY
+                );
+                """;
+
+        // 6. System Settings
+        String createSettingsTable = """
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                );
+                """;
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createUsersTable);
             stmt.execute(createUserRolesTable);
             stmt.execute(createTicketsTable);
             stmt.execute(createLeaderboardTable);
+            stmt.execute(createLoadedFilesTable);
+            stmt.execute(createSettingsTable);
             System.out.println("Database schema initialized successfully with the unified board layout.");
         } catch (SQLException e) {
             System.err.println("Failed to initialize database tables.");

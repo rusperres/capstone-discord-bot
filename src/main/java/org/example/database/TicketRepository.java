@@ -184,6 +184,18 @@ public class TicketRepository {
         }
     }
 
+    public boolean assignDeveloper(long threadId, long userId) {
+        String sql = "UPDATE tickets SET claimed_by = ? WHERE discord_thread_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, userId == 0 ? null : String.valueOf(userId));
+            pstmt.setString(2, String.valueOf(threadId));
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     /**
      * Stores the GitHub/GitLab link for a resolved ticket.
      */
@@ -249,6 +261,35 @@ public class TicketRepository {
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
+        }
+    }
+
+    public boolean markTicketLoaded(String fileName) {
+        String sql = "INSERT OR IGNORE INTO loaded_files (file_name) VALUES (?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, fileName);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // =========================================
+    // SETTINGS
+    // =========================================
+
+    public void saveSetting(String key, String value) {
+        String sql = """
+            INSERT INTO settings (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """;
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, key);
+            pstmt.setString(2, value);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 

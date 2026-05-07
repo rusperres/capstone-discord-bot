@@ -15,6 +15,12 @@ public class User {
         this.qaScore = qaScore;
     }
 
+    public String getUserId() { return userId; }
+    public String getUsername() { return username; }
+    public String getRoleName() { return roleName; }
+    public int getDevScore() { return devScore; }
+    public int getQaScore() { return qaScore; }
+
     @Override
     public String toString() {
         return String.format("%s (%s) - Dev: %d | QA: %d", username, roleName, devScore, qaScore);

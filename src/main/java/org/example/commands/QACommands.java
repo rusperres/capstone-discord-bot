@@ -3,6 +3,7 @@ package org.example.commands;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import org.example.services.TicketService;
 
 public class QACommands {
     private final TicketService ticketService;
