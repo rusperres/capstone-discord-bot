@@ -6,7 +6,11 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import org.example.commands.*;
 import org.example.database.DatabaseManager;
+import org.example.database.TicketRepository;
 import org.example.services.TicketLoader;
+import org.example.services.TicketService;
+import org.example.services.UserService;
+
 
 public class Main
 {
@@ -21,11 +25,16 @@ public class Main
         DatabaseManager db = new DatabaseManager();
         db.initialize();
 
+        TicketRepository repository = new TicketRepository(db.getConnection());
         TicketLoader loader = new TicketLoader(config.getTicketsDir());
-        GeneralCommands general = new GeneralCommands(db);
-        AdminCommands admin = new AdminCommands(db, loader);
-        DevCommands dev = new DevCommands(db);
-        QACommands qa = new QACommands(db);
+        
+        TicketService ticketService = new TicketService(repository);
+        UserService userService = new UserService(repository);
+
+        GeneralCommands general = new GeneralCommands(ticketService, userService);
+        AdminCommands admin = new AdminCommands(ticketService, loader);
+        DevCommands dev = new DevCommands(ticketService);
+        QACommands qa = new QACommands(ticketService);
 
         CommandManager commandManager = new CommandManager(
                 general,

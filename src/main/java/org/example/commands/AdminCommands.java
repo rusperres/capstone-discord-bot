@@ -4,6 +4,7 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import org.example.services.TicketLoader;
+import org.example.services.TicketService;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
