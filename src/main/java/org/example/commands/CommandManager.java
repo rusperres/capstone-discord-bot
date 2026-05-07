@@ -74,10 +74,13 @@ public class CommandManager extends ListenerAdapter {
         }
     }
 
-    public void registerCommands(JDA jda) {
-        jda.updateCommands().addCommands(
+    public void registerCommands(JDA jda, long guildId) {
+        List<net.dv8tion.jda.api.interactions.commands.build.SlashCommandData> commands = Arrays.asList(
                 Commands.slash("set-role", "Assign your role")
-                        .addOptions(new OptionData(OptionType.STRING, "role", "Dev, QA, or PM").setRequired(true)),
+                        .addOptions(new OptionData(OptionType.STRING, "role", "Select your role").setRequired(true)
+                                .addChoice("Project Manager", "PM")
+                                .addChoice("Developer", "Developer")
+                                .addChoice("QA", "QA")),
 
                 Commands.slash("load-tickets", "PM only: Load tickets from folder")
                         .addOptions(new OptionData(OptionType.STRING, "folder", "Folder name").setAutoComplete(true).setRequired(true)),
@@ -95,6 +98,23 @@ public class CommandManager extends ListenerAdapter {
                 Commands.slash("help", "Show help guide"),
 
                 Commands.slash("closed", "Close this ticket")
-        ).queue();
+        );
+
+        if (guildId != 0L) {
+            net.dv8tion.jda.api.entities.Guild guild = jda.getGuildById(guildId);
+            if (guild != null) {
+                guild.updateCommands().addCommands(commands).queue(
+                        success -> System.out.println("✅ Guild commands registered for: " + guild.getName()),
+                        error -> System.err.println("❌ Failed to register guild commands: " + error.getMessage())
+                );
+                return;
+            }
+        }
+
+        // Fallback to global
+        jda.updateCommands().addCommands(commands).queue(
+                success -> System.out.println("✅ Global commands registered."),
+                error -> System.err.println("❌ Failed to register global commands: " + error.getMessage())
+        );
     }
 }
