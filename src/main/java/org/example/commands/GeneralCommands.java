@@ -25,27 +25,47 @@ public class GeneralCommands {
 
     public void handleSetRole(SlashCommandInteractionEvent event){
         event.deferReply().queue();
-        String roleName = event.getOption("role").getAsString();
+        String roleInput = event.getOption("role").getAsString();
         Member member = event.getMember();
 
         if(member==null)return;
 
-        List<String> managedRoles = Arrays.asList("PM", "Developer", "QA");
-        for(String r: managedRoles){
-            event.getGuild().getRolesByName(r, true).stream()
-                    .findFirst()
-                    .ifPresent(role -> event.getGuild().removeRoleFromMember(member, role).queue());
+        // Configuration for roles: Shorthand -> {Discord Name, DB Name}
+        java.util.Map<String, String[]> roleMap = new java.util.HashMap<>();
+        roleMap.put("PM", new String[]{"Project Manager", "PROJECT_MANAGER"});
+        roleMap.put("Developer", new String[]{"Developer", "DEVELOPER"});
+        roleMap.put("QA", new String[]{"QA", "QA"});
+
+        String[] roles = roleMap.get(roleInput);
+        if (roles == null) {
+            event.getHook().sendMessage("❌ Invalid role selection.").queue();
+            return;
         }
 
-        Role newRole = (Role) event.getGuild().getRolesByName(roleName, true).stream()
+        String discordRoleName = roles[0];
+        String dbRoleName = roles[1];
+
+        // Cleanup old roles
+        List<String> managedDiscordRoles = Arrays.asList("PM", "Project Manager", "Developer", "QA");
+        for(String r: managedDiscordRoles){
+            event.getGuild().getRolesByName(r, true).forEach(role -> {
+                if (member.getRoles().contains(role)) {
+                    event.getGuild().removeRoleFromMember(member, role).queue();
+                }
+            });
+        }
+
+        // Assign new role
+        Role newRole = event.getGuild().getRolesByName(discordRoleName, true).stream()
                 .findFirst()
                 .orElse(null);
+
         if(newRole != null){
             event.getGuild().addRoleToMember(member, newRole).queue();
-            userService.setUserRole(member.getIdLong(), roleName);
-            event.getHook().sendMessage("✅ Role set to " + roleName).queue();
+            userService.setUserRole(member.getIdLong(), dbRoleName);
+            event.getHook().sendMessage("✅ Role set to **" + discordRoleName + "** (Registered as " + dbRoleName + ")").queue();
         } else {
-            event.getHook().sendMessage("❌ Role " + roleName + " not found in server.").queue();
+            event.getHook().sendMessage("❌ Discord role **" + discordRoleName + "** not found in server. Please ensure the role exists.").queue();
         }
     }
 

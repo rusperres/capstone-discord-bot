@@ -52,9 +52,10 @@ public class Main
                     .build();
 
             jda.awaitReady();
-            commandManager.registerCommands(jda);
+            commandManager.registerCommands(jda, config.getGuildId());
 
-            System.out.println("🚀 Bot is online in Guild: " + config.getGuildId());
+            System.out.println("🚀 Bot is online! Connected to " + jda.getGuilds().size() + " guild(s).");
+            System.out.println("📌 Configured Guild ID: " + config.getGuildId());
 
         } catch (Exception e) {
             e.printStackTrace();
