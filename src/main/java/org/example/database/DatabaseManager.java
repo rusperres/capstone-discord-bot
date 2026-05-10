@@ -62,15 +62,39 @@ public class DatabaseManager {
                 title TEXT NOT NULL,
                 ticket_description TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN ( 'OPEN', 'IN_PROGRESS', 'IN_REVIEW', 'RESOLVED', 'CLOSED')),
+                priority TEXT NOT NULL CHECK(priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+                date_added DATE,
+                date_closed DATE,
                 pr_url TEXT,                 
                 claimed_by TEXT,             
-                closed_by TEXT,              
+                closed_by TEXT,
                 FOREIGN KEY (claimed_by) REFERENCES users(user_id) ON DELETE SET NULL,
                 FOREIGN KEY (closed_by) REFERENCES users(user_id) ON DELETE SET NULL
             );
             """;
+        // 4.  Ticket Categories
 
-        // 4. Global Leaderboard
+        String createCategoriesTable = """
+            CREATE TABLE IF NOT EXISTS ticket_category (
+                category_id TEXT PRIMARY KEY,
+                category_name TEXT NOT NULL UNIQUE
+            );
+            """;
+
+
+        // 4.  Ticket Categories MAP
+        String createTicketCategoriesMapTable = """
+            CREATE TABLE IF NOT EXISTS ticket_category_map (
+                ticket_id TEXT,
+                category_id TEXT,
+                PRIMARY KEY (ticket_id, category_id), -- A ticket can't have the same category twice
+                FOREIGN KEY (ticket_id) REFERENCES tickets(ticket_id) ON DELETE CASCADE,
+                FOREIGN KEY (category_id) REFERENCES ticket_category(category_id) ON DELETE CASCADE
+            );
+            """;
+
+
+        // 6. Global Leaderboard
         String createLeaderboardTable = """
                 CREATE TABLE IF NOT EXISTS leaderboard_scores (
                 user_id TEXT,
@@ -81,14 +105,18 @@ public class DatabaseManager {
             );
             """;
 
-        // 5. Loaded Files Tracker
+
+
+
+
+        // 7. Loaded Files Tracker
         String createLoadedFilesTable = """
                 CREATE TABLE IF NOT EXISTS loaded_files (
                     file_name TEXT PRIMARY KEY
                 );
                 """;
 
-        // 6. System Settings
+        // 8. System Settings
         String createSettingsTable = """
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
@@ -96,13 +124,18 @@ public class DatabaseManager {
                 );
                 """;
 
+
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createUsersTable);
             stmt.execute(createUserRolesTable);
+            stmt.execute(createCategoriesTable);
             stmt.execute(createTicketsTable);
+            stmt.execute(createTicketCategoriesMapTable);
             stmt.execute(createLeaderboardTable);
             stmt.execute(createLoadedFilesTable);
             stmt.execute(createSettingsTable);
+
             System.out.println("Database schema initialized successfully with the unified board layout.");
         } catch (SQLException e) {
             System.err.println("Failed to initialize database tables.");
