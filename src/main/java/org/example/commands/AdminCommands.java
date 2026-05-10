@@ -47,7 +47,7 @@ public class AdminCommands {
                             for (String section : sections) {
                                 thread.sendMessage(section).queue();
                             }
-                            ticketService.addThread(thread.getIdLong(), title, "BACKLOG");
+                            ticketService.addThread(thread.getIdLong(), title, "OPEN");
                             ticketService.markTicketLoaded(fileName);
                         });
             }
