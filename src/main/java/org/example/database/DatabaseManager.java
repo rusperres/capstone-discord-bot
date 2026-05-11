@@ -63,7 +63,7 @@ public class DatabaseManager {
                 ticket_description TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN ( 'OPEN', 'IN_PROGRESS', 'IN_REVIEW', 'RESOLVED', 'CLOSED')),
                 priority TEXT NOT NULL CHECK(priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
-                date_added DATE,
+                date_added DATE, 
                 date_closed DATE,
                 pr_url TEXT,                 
                 claimed_by TEXT,             

@@ -3,6 +3,8 @@ package org.example.services;
 import org.example.database.Classes.Ticket;
 import org.example.database.TicketRepository;
 
+import java.util.UUID;
+
 public class TicketService {
     private final TicketRepository ticketRepository;
 
@@ -45,16 +47,28 @@ public class TicketService {
     public void markTicketLoaded(String fileName) {
         ticketRepository.markTicketLoaded(fileName);
     }
-
+// for rebuild
     public void addThread(long threadId, String title, String status) {
         Ticket ticket = new Ticket(
-                "TICK-" + (System.currentTimeMillis() % 10000), // Temporary ID generation
+                UUID.randomUUID().toString(), // Temporary ID generation
                 String.valueOf(threadId),
                 title,
                 "", // No description initially
                 status,
-                null, null, null
+                null,
+                null,
+                null,
+
+                "LOW",
+                null,
+                null,
+                null
         );
+        ticketRepository.saveTicket(ticket);
+    }
+// for actual load
+    public void addThread(Ticket ticket) {
+
         ticketRepository.saveTicket(ticket);
     }
 
