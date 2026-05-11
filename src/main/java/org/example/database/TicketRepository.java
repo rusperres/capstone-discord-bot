@@ -147,21 +147,44 @@ public class TicketRepository {
 
     /* ---------------------------------------------- TICKET METHODS -------------------------------------------*/
 
+    /**
+     * Inserts a new ticket record and automatically processes its categories.
+     */
     public boolean saveTicket(Ticket ticket) {
         String sql = """
-            INSERT INTO tickets (ticket_id, discord_thread_id, title, ticket_description, status, pr_url, claimed_by, closed_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tickets (ticket_id, discord_thread_id, title, ticket_description, 
+                                 status, priority, date_added, date_closed, pr_url, claimed_by, closed_by) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
+
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, ticket.getTicketId());
-            pstmt.setString(2, ticket.getDiscordThreadId()); // Can be null
+            pstmt.setString(2, ticket.getDiscordThreadId());
             pstmt.setString(3, ticket.getTitle());
             pstmt.setString(4, ticket.getDescription());
-            pstmt.setString(5, ticket.getStatus() != null ? ticket.getStatus().toUpperCase() : "BACKLOG");
-            pstmt.setString(6, ticket.getPrUrl());
-            pstmt.setString(7, ticket.getClaimedBy());
-            pstmt.setString(8, ticket.getClosedBy());
-            return pstmt.executeUpdate() > 0;
+
+            // Status and Priority safety checks to prevent CHECK constraint crashes
+            pstmt.setString(5, ticket.getStatus() != null ? ticket.getStatus().toUpperCase() : "OPEN");
+            pstmt.setString(6, ticket.getPriority() != null ? ticket.getPriority().toUpperCase() : "MEDIUM");
+
+            pstmt.setString(7, ticket.getDate_added());
+            pstmt.setString(8, ticket.getDate_closed());
+            pstmt.setString(9, ticket.getPrUrl());
+            pstmt.setString(10, ticket.getClaimedBy());
+            pstmt.setString(11, ticket.getClosedBy());
+
+            // 1. Save the main ticket row
+            boolean isSaved = pstmt.executeUpdate() > 0;
+
+            // 2. If the ticket saved successfully, loop through and save the categories!
+            if (isSaved && ticket.getCategories() != null) {
+                for (String categoryName : ticket.getCategories()) {
+                    addCategoryToTicket(ticket.getTicketId(), categoryName);
+                }
+            }
+
+            return isSaved;
+
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -200,7 +223,7 @@ public class TicketRepository {
      * Stores the GitHub/GitLab link for a resolved ticket.
      */
     public boolean setPrUrl(long threadId, String url) {
-        String sql = "UPDATE tickets SET pr_url = ?, status = 'Pending-Review' WHERE discord_thread_id = ?";
+        String sql = "UPDATE tickets SET pr_url = ?, status = 'IN_REVIEW' WHERE discord_thread_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, url);
             pstmt.setString(2, String.valueOf(threadId));
@@ -275,6 +298,70 @@ public class TicketRepository {
         }
     }
 
+
+    // =========================================
+    // CATEGORY MANAGEMENT
+    // =========================================
+
+    /**
+     * Checks if a category name exists. If it does, returns the ID.
+     * If it doesn't, creates a new one and returns the new ID.
+     */
+    private String getOrCreateCategory(String categoryName) {
+        String categoryId = null;
+
+        // 1. Try to find the existing category
+        String checkSql = "SELECT category_id FROM ticket_category WHERE category_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(checkSql)) {
+            pstmt.setString(1, categoryName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                categoryId = rs.getString("category_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        // 2. If we found it, return the ID immediately
+        if (categoryId != null) {
+            return categoryId;
+        }
+
+        // 3. If it doesn't exist, generate a new ID and save it!
+        categoryId =  java.util.UUID.randomUUID().toString();
+        String insertSql = "INSERT INTO ticket_category (category_id, category_name) VALUES (?, ?)";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(insertSql)) {
+            pstmt.setString(1, categoryId);
+            pstmt.setString(2, categoryName);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return categoryId;
+    }
+
+    /**
+     * Links a category name to a ticket ID in the junction table.
+     */
+    public boolean addCategoryToTicket(String ticketId, String categoryName) {
+        // First, guarantee the category exists and get its ID
+        String categoryId = getOrCreateCategory(categoryName);
+
+        // INSERT OR IGNORE prevents a crash if the ticket already has this exact category
+        String mapSql = "INSERT OR IGNORE INTO ticket_category_map (ticket_id, category_id) VALUES (?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(mapSql)) {
+            pstmt.setString(1, ticketId);
+            pstmt.setString(2, categoryId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
     // =========================================
     // SETTINGS
     // =========================================
@@ -302,6 +389,11 @@ public class TicketRepository {
      * This prevents you from writing the exact same mapping code multiple times.
      */
     private Ticket mapResultSetToTicket(ResultSet rs) throws SQLException {
+        String currentTicketId = rs.getString("ticket_id");
+
+        // 1. Fetch the list of strings for this specific ticket
+        List<String> categoryNames = getCategoryNamesForTicket(currentTicketId);
+
         return new Ticket(
                 rs.getString("ticket_id"),
                 rs.getString("discord_thread_id"),
@@ -310,9 +402,38 @@ public class TicketRepository {
                 rs.getString("status"),
                 rs.getString("pr_url"),
                 rs.getString("claimed_by"),
-                rs.getString("closed_by")
+                rs.getString("closed_by"),
+                rs.getString("priority"),
+                categoryNames,
+                rs.getString("date_added"),
+                rs.getString("date_closed")
+
         );
     }
+
+
+
+
+    private List<String> getCategoryNamesForTicket(String ticketId) {
+        List<String> categoryNames = new ArrayList<>();
+        String sql = """
+            SELECT tc.category_name 
+            FROM ticket_category_map tcm
+            JOIN ticket_category tc ON tcm.category_id = tc.category_id
+            WHERE tcm.ticket_id = ?
+            """;
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, ticketId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                categoryNames.add(rs.getString("category_name"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return categoryNames;
+    }
+
 
     private boolean modifyScore(long userId, String scoreType, int amount) {
         String sql = """
