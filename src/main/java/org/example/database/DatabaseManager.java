@@ -61,7 +61,7 @@ public class DatabaseManager {
                 discord_thread_id TEXT UNIQUE,     -- The Discord ID (Starts as NULL)
                 title TEXT NOT NULL,
                 ticket_description TEXT NOT NULL,
-                status TEXT NOT NULL CHECK(status IN ( 'OPEN', 'IN_PROGRESS', 'IN_REVIEW', 'RESOLVED', 'CLOSED')),
+                status TEXT NOT NULL CHECK(status IN ('OPEN', 'CLAIMED', 'PENDING-REVIEW', 'REVIEWED', 'RESOLVED', 'CLOSED')),
                 priority TEXT NOT NULL CHECK(priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
                 date_added DATE, 
                 date_closed DATE,

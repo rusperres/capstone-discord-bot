@@ -50,8 +50,9 @@ public class Ticket {
     private void validateStatus(){
         switch (this.status){
             case "OPEN" -> {}
-            case "IN_PROGRESS" -> {}
-            case "IN_REVIEW" -> {}
+            case "CLAIMED" -> {}
+            case "PENDING-REVIEW" -> {}
+            case "REVIEWED" -> {}
             case "RESOLVED" -> {}
             case "CLOSED" -> {}
             default -> {
