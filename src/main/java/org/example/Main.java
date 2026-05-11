@@ -8,6 +8,7 @@ import org.example.commands.*;
 import org.example.database.DatabaseManager;
 import org.example.database.TicketRepository;
 import org.example.services.TicketLoader;
+import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.example.services.UserService;
 
@@ -27,12 +28,12 @@ public class Main
 
         TicketRepository repository = new TicketRepository(db.getConnection());
         TicketLoader loader = new TicketLoader(config.getTicketsDir());
-        
+        TicketMarkdownParser ticketMarkdownParser = new TicketMarkdownParser();
         TicketService ticketService = new TicketService(repository);
         UserService userService = new UserService(repository);
 
         GeneralCommands general = new GeneralCommands(ticketService, userService);
-        AdminCommands admin = new AdminCommands(ticketService, loader);
+        AdminCommands admin = new AdminCommands(ticketService, loader, ticketMarkdownParser);
         DevCommands dev = new DevCommands(ticketService);
         QACommands qa = new QACommands(ticketService);
 

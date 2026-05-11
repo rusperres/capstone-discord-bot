@@ -3,7 +3,9 @@ package org.example.commands;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import org.example.database.Classes.Ticket;
 import org.example.services.TicketLoader;
+import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.jetbrains.annotations.NotNull;
 
@@ -18,10 +20,12 @@ import java.util.stream.Collectors;
 public class AdminCommands {
     private final TicketService ticketService;
     private final TicketLoader ticketLoader;
+    private final TicketMarkdownParser ticketMarkdownParser;
 
-    public AdminCommands(TicketService ticketService, TicketLoader ticketLoader) {
+    public AdminCommands(TicketService ticketService, TicketLoader ticketLoader, TicketMarkdownParser ticketMarkdownParser) {
         this.ticketService = ticketService;
         this.ticketLoader = ticketLoader;
+        this.ticketMarkdownParser = ticketMarkdownParser;
     }
 
     public void handleLoadTickets(SlashCommandInteractionEvent event) {
@@ -37,8 +41,9 @@ public class AdminCommands {
                 if (ticketService.isTicketLoaded(fileName)) continue;
 
                 // 2. Ask service for the content
-                String content = ticketLoader.loadFileContent(file);
-                String title = fileName.replace(".md", "");
+                Ticket ticket = ticketMarkdownParser.parse(file);
+                String title = ticket.getTitle();
+                String content = ticket.getDescription();
 
                 event.getChannel().asTextChannel().createThreadChannel("[OPEN] " + title)
                         .setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_1_HOUR)
@@ -47,7 +52,8 @@ public class AdminCommands {
                             for (String section : sections) {
                                 thread.sendMessage(section).queue();
                             }
-                            ticketService.addThread(thread.getIdLong(), title, "OPEN");
+
+                            ticketService.addThread(ticket);
                             ticketService.markTicketLoaded(fileName);
                         });
             }

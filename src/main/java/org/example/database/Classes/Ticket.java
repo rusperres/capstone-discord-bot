@@ -21,7 +21,11 @@ public class Ticket {
     private String date_added; // new update
 
 
-    public Ticket(String ticketId, String discordThreadId, String title, String description, String status, String prUrl, String claimedBy, String closedBy, String priority, List<String> categories, String date_added, String date_closed) {
+    public Ticket(String ticketId, String discordThreadId,
+                  String title, String description, String status,
+                  String prUrl, String claimedBy, String closedBy,
+                  String priority, List<String> categories,
+                  String date_added, String date_closed) {
         this.ticketId = ticketId;
         this.title = title;
         this.description = description;
@@ -46,8 +50,9 @@ public class Ticket {
     private void validateStatus(){
         switch (this.status){
             case "OPEN" -> {}
-            case "IN_PROGRESS" -> {}
-            case "IN_REVIEW" -> {}
+            case "CLAIMED" -> {}
+            case "PENDING-REVIEW" -> {}
+            case "REVIEWED" -> {}
             case "RESOLVED" -> {}
             case "CLOSED" -> {}
             default -> {
