@@ -66,8 +66,8 @@ public class DatabaseManager {
                 date_added DATE, 
                 date_closed DATE,
                 pr_url TEXT,                 
-                claimed_by TEXT,             
-                closed_by TEXT,
+                claimed_by TEXT DEFAULT NULL,             
+                closed_by TEXT DEFAULT NULL,
                 FOREIGN KEY (claimed_by) REFERENCES users(user_id) ON DELETE SET NULL,
                 FOREIGN KEY (closed_by) REFERENCES users(user_id) ON DELETE SET NULL
             );

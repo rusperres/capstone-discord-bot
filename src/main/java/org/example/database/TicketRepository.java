@@ -153,8 +153,8 @@ public class TicketRepository {
     public boolean saveTicket(Ticket ticket) {
         String sql = """
             INSERT INTO tickets (ticket_id, discord_thread_id, title, ticket_description, 
-                                 status, priority, date_added, date_closed, pr_url, claimed_by, closed_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 status, priority, date_added, date_closed, pr_url) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -170,8 +170,6 @@ public class TicketRepository {
             pstmt.setString(7, ticket.getDate_added());
             pstmt.setString(8, ticket.getDate_closed());
             pstmt.setString(9, ticket.getPrUrl());
-            pstmt.setString(10, ticket.getClaimedBy());
-            pstmt.setString(11, ticket.getClosedBy());
 
             // 1. Save the main ticket row
             boolean isSaved = pstmt.executeUpdate() > 0;
