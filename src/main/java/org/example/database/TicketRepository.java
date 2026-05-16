@@ -3,10 +3,7 @@ package org.example.database;
 import org.example.database.Classes.Ticket;
 import org.example.database.Classes.User;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -161,21 +158,23 @@ public class TicketRepository {
      */
     public List<User> getLeaderboard(String type, int limit) {
         List<User> topUsers = new ArrayList<>();
+        boolean isAll = type.equalsIgnoreCase("ALL");
         String dbRole = type.equalsIgnoreCase("DEV") ? "DEVELOPER" : "QA";
         String sql = """
             SELECT u.user_id, u.username, COALESCE(l.score, 0) as score, ur.role_name
             FROM users u
             JOIN user_roles ur ON u.user_id = ur.user_id
             LEFT JOIN leaderboard_scores l ON u.user_id = l.user_id AND l.score_type = ?
-            WHERE ur.role_name = ?
+            WHERE (? = 1 OR ur.role_name = ?)
             ORDER BY score DESC
             LIMIT ?;
             """;
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, type.toUpperCase()); // Ensure it matches 'DEV' or 'QA' in leaderboard_scores
-            pstmt.setString(2, dbRole);
-            pstmt.setInt(3, limit);
+            pstmt.setString(1, isAll ? "DEV" : type.toUpperCase()); // Default to DEV scores for 'ALL' view
+            pstmt.setInt(2, isAll ? 1 : 0);
+            pstmt.setString(3, dbRole);
+            pstmt.setInt(4, limit);
             ResultSet rs = pstmt.executeQuery();
 
             while (rs.next()) {
@@ -610,14 +609,26 @@ public class TicketRepository {
     /* ---------------------------------------------------------------------------------------------------------*/
 
 
-
-
-
-
-
-
-
-
-
-
+    public java.util.Map<String, Integer> getGlobalStats() {
+        java.util.Map<String, Integer> stats = new java.util.HashMap<>();
+        try {
+            // Use PreparedStatements for consistency or just Statement for simple queries
+            try (Statement stmt = connection.createStatement()) {
+                ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users");
+                if (rs.next()) stats.put("totalUsers", rs.getInt(1));
+                
+                rs = stmt.executeQuery("SELECT COUNT(DISTINCT user_id) FROM user_roles");
+                if (rs.next()) stats.put("activeUsers", rs.getInt(1));
+                
+                rs = stmt.executeQuery("SELECT COUNT(*) FROM tickets WHERE status != 'CLOSED'");
+                if (rs.next()) stats.put("activeTickets", rs.getInt(1));
+                
+                rs = stmt.executeQuery("SELECT COUNT(*) FROM tickets WHERE status = 'CLOSED'");
+                if (rs.next()) stats.put("closedTickets", rs.getInt(1));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return stats;
+    }
 }

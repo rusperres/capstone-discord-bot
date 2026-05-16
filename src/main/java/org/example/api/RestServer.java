@@ -56,6 +56,7 @@ public class RestServer {
         AuthController authController = new AuthController(authService, userService);
 
         server.createContext("/api/tickets", ticketController);
+        server.createContext("/api/stats", ticketController);
         server.createContext("/api/profile", userController);
         server.createContext("/api/user", userController);
         server.createContext("/api/auth", authController);
