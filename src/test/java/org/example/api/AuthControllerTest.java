@@ -3,6 +3,7 @@ package org.example.api;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import org.example.services.AuthService;
+import org.example.services.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -25,12 +26,15 @@ public class AuthControllerTest {
     @Mock
     private HttpExchange exchange;
 
+    @Mock
+    private UserService userService;
+
     private AuthController authController;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        authController = new AuthController(authService);
+        authController = new AuthController(authService, userService);
     }
 
     @Test
@@ -53,11 +57,11 @@ public class AuthControllerTest {
     public void testHandleCallbackSuccess() throws IOException, InterruptedException {
         when(exchange.getRequestMethod()).thenReturn("GET");
         when(exchange.getRequestURI()).thenReturn(URI.create("/api/auth/callback?code=test_code&state=test_state"));
-        when(authService.getPendingData("test_state")).thenReturn("session123:user123");
+        when(authService.getPendingData("test_state")).thenReturn("session123:12345");
         when(authService.exchangeCodeForToken("test_code")).thenReturn("test_token");
         
-        AuthService.UserSession session = new AuthService.UserSession("user123", "dId", "dName", "dAv", "test_token");
-        when(authService.fetchUserInfo("test_token", "user123")).thenReturn(session);
+        AuthService.UserSession session = new AuthService.UserSession("12345", "dId", "dName", "dAv", "test_token");
+        when(authService.fetchUserInfo("test_token", "12345")).thenReturn(session);
 
         Headers headers = new Headers();
         when(exchange.getResponseHeaders()).thenReturn(headers);
@@ -67,6 +71,7 @@ public class AuthControllerTest {
         authController.handle(exchange);
 
         verify(authService).createSession(eq("session123"), any());
+        verify(userService).updateUsername(12345L, "dName"); // In my test I'll use 12345L as userId
         assertTrue(headers.getFirst("Set-Cookie").contains("sessionId=session123"));
         verify(exchange).sendResponseHeaders(eq(200), anyLong());
         assertEquals("{\"authenticated\":true}", os.toString());

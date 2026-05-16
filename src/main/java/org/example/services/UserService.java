@@ -18,6 +18,10 @@ public class UserService {
         ticketRepository.upsertUser(userId, role);
     }
 
+    public void updateUsername(long userId, String username) {
+        ticketRepository.updateUsername(userId, username);
+    }
+
     public List<LeaderboardEntry> getLeaderboard(String type) {
         // TicketRepository returns List<User>, we need to convert to List<LeaderboardEntry>
         List<User> topUsers = ticketRepository.getLeaderboard(type, 10);

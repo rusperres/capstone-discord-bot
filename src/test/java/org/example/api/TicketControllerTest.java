@@ -8,6 +8,9 @@ import org.example.commands.GeneralCommands;
 import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
 import org.example.database.TicketRepository;
+import org.example.services.AuthService;
+import org.example.services.TicketLoader;
+import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,12 +50,28 @@ public class TicketControllerTest {
     @Mock
     private HttpExchange exchange;
 
+    @Mock
+    private AuthService authService;
+
+    @Mock
+    private TicketLoader ticketLoader;
+
+    @Mock
+    private TicketMarkdownParser ticketMarkdownParser;
+
     private TicketController ticketController;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        ticketController = new TicketController(123L, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands);
+        ticketController = new TicketController(123L, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService, ticketLoader, ticketMarkdownParser);
+
+        // Mock a valid session for all tests
+        Headers requestHeaders = new Headers();
+        requestHeaders.add("Cookie", "sessionId=valid_session");
+        when(exchange.getRequestHeaders()).thenReturn(requestHeaders);
+        AuthService.UserSession mockSession = new AuthService.UserSession("123", "did", "username", "av", "token");
+        when(authService.getSession("valid_session")).thenReturn(mockSession);
     }
 
     @Test

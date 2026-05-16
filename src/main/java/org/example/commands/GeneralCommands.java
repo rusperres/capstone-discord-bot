@@ -64,12 +64,14 @@ public class GeneralCommands {
                 .findFirst()
                 .orElse(null);
 
+        // Always update the database role
+        userService.setUserRole(member.getIdLong(), dbRoleName);
+
         if(newRole != null){
             guild.addRoleToMember(member, newRole).queue();
-            userService.setUserRole(member.getIdLong(), dbRoleName);
             if (responseHandler != null) responseHandler.accept("✅ Role set to **" + discordRoleName + "** (Registered as " + dbRoleName + ")");
         } else {
-            if (responseHandler != null) responseHandler.accept("❌ Discord role **" + discordRoleName + "** not found in server. Please ensure the role exists.");
+            if (responseHandler != null) responseHandler.accept("⚠️ Registered as " + dbRoleName + " in DB, but Discord role **" + discordRoleName + "** not found in server.");
         }
     }
 

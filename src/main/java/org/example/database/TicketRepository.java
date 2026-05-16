@@ -25,26 +25,38 @@ public class TicketRepository {
         // Ensure the user exists in the main users table first
         String insertUserSql = "INSERT OR IGNORE INTO users (user_id, username) VALUES (?, 'Unknown')";
 
-        // Upsert their specific role
-        String upsertRoleSql = """
-            INSERT INTO user_roles (user_id, role_name) 
-            VALUES (?, ?)
-            ON CONFLICT(user_id, role_name) DO UPDATE SET 
-            role_name = excluded.role_name;
-            """;
+        String deleteOldRolesSql = "DELETE FROM user_roles WHERE user_id = ?";
+        String insertRoleSql = "INSERT INTO user_roles (user_id, role_name) VALUES (?, ?)";
 
         try (PreparedStatement pstmtUser = connection.prepareStatement(insertUserSql);
-             PreparedStatement pstmtRole = connection.prepareStatement(upsertRoleSql)) {
+             PreparedStatement pstmtDelete = connection.prepareStatement(deleteOldRolesSql);
+             PreparedStatement pstmtInsert = connection.prepareStatement(insertRoleSql)) {
 
             // 1. Insert user if missing
             pstmtUser.setString(1, stringId);
             pstmtUser.executeUpdate();
 
-            // 2. Assign/Update role
-            pstmtRole.setString(1, stringId);
-            pstmtRole.setString(2, role);
-            return pstmtRole.executeUpdate() > 0;
+            // 2. Remove any old roles to enforce 1 role per user constraint despite composite PK
+            pstmtDelete.setString(1, stringId);
+            pstmtDelete.executeUpdate();
 
+            // 3. Assign new role
+            pstmtInsert.setString(1, stringId);
+            pstmtInsert.setString(2, role);
+            return pstmtInsert.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean updateUsername(long userId, String username) {
+        String sql = "UPDATE users SET username = ? WHERE user_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            pstmt.setString(2, String.valueOf(userId));
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -148,6 +160,52 @@ public class TicketRepository {
     /* ---------------------------------------------- TICKET METHODS -------------------------------------------*/
 
     /**
+     * Deletes all tickets and related data for a full rebuild.
+     */
+    public boolean deleteAllTickets() {
+        try {
+            connection.createStatement().executeUpdate("DELETE FROM ticket_category_map");
+            connection.createStatement().executeUpdate("DELETE FROM loaded_files");
+            connection.createStatement().executeUpdate("DELETE FROM tickets");
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Finds a ticket by its exact title (case-insensitive). Returns the first match.
+     */
+    public Ticket findTicketByTitle(String title) {
+        String sql = "SELECT * FROM tickets WHERE lower(title) = lower(?) LIMIT 1";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, title);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) return mapResultSetToTicket(rs);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Updates the description and discord_thread_id of an existing ticket (enrichment after rebuild).
+     */
+    public boolean updateTicketDescription(String ticketId, String description, String discordThreadId) {
+        String sql = "UPDATE tickets SET ticket_description = ?, discord_thread_id = ? WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, description);
+            pstmt.setString(2, discordThreadId);
+            pstmt.setString(3, ticketId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Inserts a new ticket record and automatically processes its categories.
      */
     public boolean saveTicket(Ticket ticket) {
@@ -170,6 +228,8 @@ public class TicketRepository {
             pstmt.setString(7, ticket.getDate_added());
             pstmt.setString(8, ticket.getDate_closed());
             pstmt.setString(9, ticket.getPrUrl());
+            pstmt.setString(10, ticket.getClaimedBy() != null && !ticket.getClaimedBy().trim().isEmpty() ? ticket.getClaimedBy() : null);
+            pstmt.setString(11, ticket.getClosedBy() != null && !ticket.getClosedBy().trim().isEmpty() ? ticket.getClosedBy() : null);
 
             // 1. Save the main ticket row
             boolean isSaved = pstmt.executeUpdate() > 0;
@@ -205,11 +265,41 @@ public class TicketRepository {
         }
     }
 
+    /**
+     * Changes a ticket's state using the internal ticket UUID.
+     */
+    public boolean updateTicketStatusByTicketId(String ticketId, String status) {
+        String sql = "UPDATE tickets SET status = ? WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, status.toUpperCase());
+            pstmt.setString(2, ticketId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public boolean assignDeveloper(long threadId, long userId) {
         String sql = "UPDATE tickets SET claimed_by = ? WHERE discord_thread_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, userId == 0 ? null : String.valueOf(userId));
             pstmt.setString(2, String.valueOf(threadId));
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Assigns a developer to a ticket using the internal ticket UUID.
+     */
+    public boolean assignDeveloperByTicketId(String ticketId, long userId) {
+        String sql = "UPDATE tickets SET claimed_by = ? WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, userId == 0 ? null : String.valueOf(userId));
+            pstmt.setString(2, ticketId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -225,6 +315,21 @@ public class TicketRepository {
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, url);
             pstmt.setString(2, String.valueOf(threadId));
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Stores the GitHub/GitLab link for a resolved ticket using the internal ticket UUID.
+     */
+    public boolean setPrUrlByTicketId(String ticketId, String url) {
+        String sql = "UPDATE tickets SET pr_url = ?, status = 'IN_REVIEW' WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, url);
+            pstmt.setString(2, ticketId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -249,6 +354,24 @@ public class TicketRepository {
             e.printStackTrace();
         }
         return null; // Return null if not found
+    }
+
+    /**
+     * Retrieves a full ticket row as a Ticket object using the internal ticket UUID.
+     */
+    public Ticket findTicketByTicketId(String ticketId) {
+        String sql = "SELECT * FROM tickets WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, ticketId);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToTicket(rs);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**
@@ -306,38 +429,28 @@ public class TicketRepository {
      * If it doesn't, creates a new one and returns the new ID.
      */
     private String getOrCreateCategory(String categoryName) {
-        String categoryId = null;
-
-        // 1. Try to find the existing category
-        String checkSql = "SELECT category_id FROM ticket_category WHERE category_name = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(checkSql)) {
-            pstmt.setString(1, categoryName);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                categoryId = rs.getString("category_id");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        // 2. If we found it, return the ID immediately
-        if (categoryId != null) {
-            return categoryId;
-        }
-
-        // 3. If it doesn't exist, generate a new ID and save it!
-        categoryId =  java.util.UUID.randomUUID().toString();
-        String insertSql = "INSERT INTO ticket_category (category_id, category_name) VALUES (?, ?)";
-
+        // Speculatively insert to avoid race conditions across multiple worker threads
+        String insertSql = "INSERT OR IGNORE INTO ticket_category (category_id, category_name) VALUES (?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(insertSql)) {
-            pstmt.setString(1, categoryId);
+            pstmt.setString(1, java.util.UUID.randomUUID().toString());
             pstmt.setString(2, categoryName);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-        return categoryId;
+        // Must exist now, just retrieve its ID
+        String checkSql = "SELECT category_id FROM ticket_category WHERE category_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(checkSql)) {
+            pstmt.setString(1, categoryName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("category_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**

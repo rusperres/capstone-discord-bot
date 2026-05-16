@@ -3,6 +3,7 @@ package org.example.api;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import org.example.services.AuthService;
+import org.example.services.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,9 +17,11 @@ import java.util.regex.Pattern;
 public class AuthController implements HttpHandler {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private final AuthService authService;
+    private final UserService userService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, UserService userService) {
         this.authService = authService;
+        this.userService = userService;
     }
 
     @Override
@@ -91,6 +94,14 @@ public class AuthController implements HttpHandler {
             }
 
             authService.createSession(sessionId, session);
+            
+            // Persist the Discord username to our database
+            try {
+                userService.updateUsername(Long.parseLong(userId), session.username);
+                System.out.println("Updated username for user " + userId + " to " + session.username);
+            } catch (NumberFormatException e) {
+                logger.warn("Could not update username for non-numeric userId: {}", userId);
+            }
 
             // Set-Cookie: sessionId=abc123; HttpOnly; Secure; Path=/; SameSite=Lax
             String cookie = "sessionId=" + sessionId + "; HttpOnly; Path=/; SameSite=Lax";

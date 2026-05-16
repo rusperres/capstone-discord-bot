@@ -63,7 +63,7 @@ public class Main
 
             // Start REST Server
             int port = 8080; 
-            RestServer restServer = new RestServer(port, config.getGuildId(), jda, ticketService, userService, repository, general, dev, qa, authService);
+            RestServer restServer = new RestServer(port, config.getGuildId(), jda, ticketService, userService, repository, general, dev, qa, authService, loader, ticketMarkdownParser);
             restServer.start();
             System.out.println("🌐 REST API is listening on port " + port);
 
