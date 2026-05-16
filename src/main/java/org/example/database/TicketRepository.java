@@ -219,11 +219,41 @@ public class TicketRepository {
         }
     }
 
+    /**
+     * Changes a ticket's state using the internal ticket UUID.
+     */
+    public boolean updateTicketStatusByTicketId(String ticketId, String status) {
+        String sql = "UPDATE tickets SET status = ? WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, status.toUpperCase());
+            pstmt.setString(2, ticketId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public boolean assignDeveloper(long threadId, long userId) {
         String sql = "UPDATE tickets SET claimed_by = ? WHERE discord_thread_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, userId == 0 ? null : String.valueOf(userId));
             pstmt.setString(2, String.valueOf(threadId));
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Assigns a developer to a ticket using the internal ticket UUID.
+     */
+    public boolean assignDeveloperByTicketId(String ticketId, long userId) {
+        String sql = "UPDATE tickets SET claimed_by = ? WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, userId == 0 ? null : String.valueOf(userId));
+            pstmt.setString(2, ticketId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -239,6 +269,21 @@ public class TicketRepository {
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, url);
             pstmt.setString(2, String.valueOf(threadId));
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Stores the GitHub/GitLab link for a resolved ticket using the internal ticket UUID.
+     */
+    public boolean setPrUrlByTicketId(String ticketId, String url) {
+        String sql = "UPDATE tickets SET pr_url = ?, status = 'IN_REVIEW' WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, url);
+            pstmt.setString(2, ticketId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();

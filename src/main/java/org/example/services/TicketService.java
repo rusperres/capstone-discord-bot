@@ -16,12 +16,24 @@ public class TicketService {
         ticketRepository.updateTicketStatus(threadId, status);
     }
 
+    public void updateTicketStatusByTicketId(String ticketId, String status) {
+        ticketRepository.updateTicketStatusByTicketId(ticketId, status);
+    }
+
     public void assignDeveloper(long threadId, long userId) {
         ticketRepository.assignDeveloper(threadId, userId);
     }
 
+    public void assignDeveloperByTicketId(String ticketId, long userId) {
+        ticketRepository.assignDeveloperByTicketId(ticketId, userId);
+    }
+
     public void setPrUrl(long threadId, String prUrl) {
         ticketRepository.setPrUrl(threadId, prUrl);
+    }
+
+    public void setPrUrlByTicketId(String ticketId, String prUrl) {
+        ticketRepository.setPrUrlByTicketId(ticketId, prUrl);
     }
 
     public void incrementDeveloperScore(long userId) {

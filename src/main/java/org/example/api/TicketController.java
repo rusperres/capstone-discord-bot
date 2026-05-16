@@ -69,19 +69,17 @@ public class TicketController implements HttpHandler {
                 handleListTickets(exchange);
             } else if ("POST".equals(method) && "/api/tickets/load".equals(path)) {
                 handleLoadTickets(exchange);
-            } else if ("GET".equals(method) && path.matches("/api/tickets/\\d+")) {
-                handleGetTicket(exchange, path);
             } else if ("GET".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+")) {
-                handleGetTicketByUUID(exchange, path);
-            } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/claim")) {
+                handleGetTicket(exchange, path);
+            } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/claim")) {
                 handleClaimTicket(exchange, path);
-            } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/resolve")) {
+            } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/resolve")) {
                 handleResolveTicket(exchange, path);
-            } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/close")) {
+            } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/close")) {
                 handleUpdateStatus(exchange, path, "CLOSED");
-            } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/review")) {
+            } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/review")) {
                 handleUpdateStatus(exchange, path, "IN_REVIEW");
-            } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/demote")) {
+            } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/demote")) {
                 handleUpdateStatus(exchange, path, "OPEN");
             } else {
                 logger.warn("Route not found: {} {}", method, path);
@@ -105,18 +103,13 @@ public class TicketController implements HttpHandler {
     }
 
     private void handleGetTicket(HttpExchange exchange, String path) throws IOException {
-        long id = extractId(path);
-        Ticket ticket = ticketRepository.findTicketByThreadId(id);
-        if (ticket != null) {
-            sendResponse(exchange, 200, ticket.toJson());
+        String rawId = extractRawId(path);
+        Ticket ticket;
+        if (isNumeric(rawId)) {
+            ticket = ticketRepository.findTicketByThreadId(Long.parseLong(rawId));
         } else {
-            sendResponse(exchange, 404, "{\"error\":\"Ticket not found\"}");
+            ticket = ticketRepository.findTicketByTicketId(rawId);
         }
-    }
-
-    private void handleGetTicketByUUID(HttpExchange exchange, String path) throws IOException {
-        String ticketId = extractUUID(path);
-        Ticket ticket = ticketRepository.findTicketByTicketId(ticketId);
         if (ticket != null) {
             sendResponse(exchange, 200, ticket.toJson());
         } else {
@@ -187,7 +180,7 @@ public class TicketController implements HttpHandler {
     }
 
     private void handleClaimTicket(HttpExchange exchange, String path) throws IOException {
-        long ticketId = extractId(path);
+        String rawId = extractRawId(path);
         String body = readBody(exchange);
         long userId = extractLongFromJson(body, "userId");
         if (userId == 0) {
@@ -195,26 +188,32 @@ public class TicketController implements HttpHandler {
             return;
         }
 
-        ThreadChannel thread = jda.getThreadChannelById(ticketId);
-        if (thread != null) {
-            Member member = thread.getGuild().getMemberById(userId);
-            if (member != null) {
-                devCommands.performClaim(thread, member);
-                logger.info("Ticket {} claimed by user {} via REST API", ticketId, userId);
-                sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
-                return;
+        if (isNumeric(rawId)) {
+            long ticketId = Long.parseLong(rawId);
+            ThreadChannel thread = jda.getThreadChannelById(ticketId);
+            if (thread != null) {
+                Member member = thread.getGuild().getMemberById(userId);
+                if (member != null) {
+                    devCommands.performClaim(thread, member);
+                    logger.info("Ticket {} claimed by user {} via REST API", ticketId, userId);
+                    sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
+                    return;
+                }
             }
+            // Fallback for numeric ID
+            ticketService.assignDeveloper(ticketId, userId);
+            ticketService.updateThreadStatus(ticketId, "CLAIMED");
+        } else {
+            // UUID-based ticket (no Discord thread)
+            ticketService.assignDeveloperByTicketId(rawId, userId);
+            ticketService.updateTicketStatusByTicketId(rawId, "CLAIMED");
         }
-
-        // Fallback if Discord sync fails or is not applicable
-        ticketService.assignDeveloper(ticketId, userId);
-        ticketService.updateThreadStatus(ticketId, "CLAIMED");
-        logger.info("Ticket {} claimed by user {} (Fallback path)", ticketId, userId);
-        sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully (DB only)\"}");
+        logger.info("Ticket {} claimed by user {} (DB only)", rawId, userId);
+        sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
     }
 
     private void handleResolveTicket(HttpExchange exchange, String path) throws IOException {
-        long ticketId = extractId(path);
+        String rawId = extractRawId(path);
         String body = readBody(exchange);
         String prUrl = extractStringFromJson(body, "prUrl");
         if (prUrl.isEmpty()) {
@@ -222,71 +221,75 @@ public class TicketController implements HttpHandler {
             return;
         }
 
-        ThreadChannel thread = jda.getThreadChannelById(ticketId);
-        if (thread != null) {
-            Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
-            if (ticket != null && ticket.getClaimedBy() != null) {
-                Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
-                if (member != null) {
-                    devCommands.performResolved(thread, member, prUrl);
-                    logger.info("Ticket {} resolved with PR {} via REST API", ticketId, prUrl);
-                    sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review\"}");
-                    return;
+        if (isNumeric(rawId)) {
+            long ticketId = Long.parseLong(rawId);
+            ThreadChannel thread = jda.getThreadChannelById(ticketId);
+            if (thread != null) {
+                Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
+                if (ticket != null && ticket.getClaimedBy() != null) {
+                    Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                    if (member != null) {
+                        devCommands.performResolved(thread, member, prUrl);
+                        logger.info("Ticket {} resolved with PR {} via REST API", ticketId, prUrl);
+                        sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review\"}");
+                        return;
+                    }
                 }
             }
+            ticketService.setPrUrl(ticketId, prUrl);
+        } else {
+            ticketService.setPrUrlByTicketId(rawId, prUrl);
         }
-
-        ticketService.setPrUrl(ticketId, prUrl);
-        logger.info("Ticket {} resolved with PR {} (Fallback path)", ticketId, prUrl);
+        logger.info("Ticket {} resolved with PR {} (DB only)", rawId, prUrl);
         sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review (DB only)\"}");
     }
 
     private void handleUpdateStatus(HttpExchange exchange, String path, String status) throws IOException {
-        long ticketId = extractId(path);
-        ThreadChannel thread = jda.getThreadChannelById(ticketId);
-        
-        if (thread != null) {
-            switch (status) {
-                case "CLOSED":
-                    generalCommands.performClosed(thread);
-                    break;
-                case "IN_REVIEW":
-                    Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
-                    if (ticket != null && ticket.getClaimedBy() != null) {
-                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
-                        if (member != null) {
-                            qaCommands.performUnreview(thread, member); // Moving to IN_REVIEW is essentially unreviewing if it was REVIEWED
+        String rawId = extractRawId(path);
+
+        if (isNumeric(rawId)) {
+            long ticketId = Long.parseLong(rawId);
+            ThreadChannel thread = jda.getThreadChannelById(ticketId);
+            if (thread != null) {
+                switch (status) {
+                    case "CLOSED":
+                        generalCommands.performClosed(thread);
+                        break;
+                    case "IN_REVIEW":
+                        Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
+                        if (ticket != null && ticket.getClaimedBy() != null) {
+                            Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                            if (member != null) {
+                                qaCommands.performUnreview(thread, member);
+                            }
                         }
-                    }
-                    break;
-                case "OPEN":
-                    devCommands.performUnclaim(thread);
-                    break;
+                        break;
+                    case "OPEN":
+                        devCommands.performUnclaim(thread);
+                        break;
+                }
+            } else {
+                ticketService.updateThreadStatus(ticketId, status);
             }
         } else {
-            ticketService.updateThreadStatus(ticketId, status);
+            ticketService.updateTicketStatusByTicketId(rawId, status);
         }
 
-        logger.info("Ticket {} status updated to {} via REST API", ticketId, status);
+        logger.info("Ticket {} status updated to {} via REST API", rawId, status);
         sendResponse(exchange, 200, "{\"message\":\"Ticket status updated to " + status + "\"}");
     }
 
-    private long extractId(String path) {
-        Pattern pattern = Pattern.compile("/api/tickets/(\\d+)");
-        Matcher matcher = pattern.matcher(path);
-        if (matcher.find()) {
-            return Long.parseLong(matcher.group(1));
-        }
-        return -1;
-    }
-
-    private String extractUUID(String path) {
+    private String extractRawId(String path) {
         Pattern pattern = Pattern.compile("/api/tickets/([a-fA-F0-9\\-]+)");
         Matcher matcher = pattern.matcher(path);
         if (matcher.find()) {
             return matcher.group(1);
         }
         return "";
+    }
+
+    private boolean isNumeric(String str) {
+        return str != null && str.matches("\\d+");
     }
 
     private String readBody(HttpExchange exchange) throws IOException {
