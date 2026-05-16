@@ -71,6 +71,8 @@ public class TicketController implements HttpHandler {
                 handleLoadTickets(exchange);
             } else if ("GET".equals(method) && path.matches("/api/tickets/\\d+")) {
                 handleGetTicket(exchange, path);
+            } else if ("GET".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+")) {
+                handleGetTicketByUUID(exchange, path);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/claim")) {
                 handleClaimTicket(exchange, path);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/resolve")) {
@@ -105,6 +107,16 @@ public class TicketController implements HttpHandler {
     private void handleGetTicket(HttpExchange exchange, String path) throws IOException {
         long id = extractId(path);
         Ticket ticket = ticketRepository.findTicketByThreadId(id);
+        if (ticket != null) {
+            sendResponse(exchange, 200, ticket.toJson());
+        } else {
+            sendResponse(exchange, 404, "{\"error\":\"Ticket not found\"}");
+        }
+    }
+
+    private void handleGetTicketByUUID(HttpExchange exchange, String path) throws IOException {
+        String ticketId = extractUUID(path);
+        Ticket ticket = ticketRepository.findTicketByTicketId(ticketId);
         if (ticket != null) {
             sendResponse(exchange, 200, ticket.toJson());
         } else {
@@ -266,6 +278,15 @@ public class TicketController implements HttpHandler {
             return Long.parseLong(matcher.group(1));
         }
         return -1;
+    }
+
+    private String extractUUID(String path) {
+        Pattern pattern = Pattern.compile("/api/tickets/([a-fA-F0-9\\-]+)");
+        Matcher matcher = pattern.matcher(path);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "";
     }
 
     private String readBody(HttpExchange exchange) throws IOException {

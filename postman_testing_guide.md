@@ -110,7 +110,7 @@ Assume `{{TICKET_ID}}` is the Discord Thread ID for the ticket.
 
 **2. Get Specific Ticket Details**
 - **Method:** `GET`
-- **URL:** `{{BASE_URL}}/tickets/{{TICKET_ID}}`
+- **URL:** `{{BASE_URL}}/tickets/{{TICKET_ID}}` (supports both UUID ticket IDs and numeric Discord thread IDs)
 - **Expected Result:** `200 OK` with JSON ticket details (status, title, etc).
 
 **3. Claim a Ticket**

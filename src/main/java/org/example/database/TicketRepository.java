@@ -266,6 +266,24 @@ public class TicketRepository {
     }
 
     /**
+     * Retrieves a full ticket row as a Ticket object using the internal ticket UUID.
+     */
+    public Ticket findTicketByTicketId(String ticketId) {
+        String sql = "SELECT * FROM tickets WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, ticketId);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToTicket(rs);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
      * Returns a list of all tickets that aren't marked as CLOSED.
      */
     public List<Ticket> getAllActiveTickets() {
