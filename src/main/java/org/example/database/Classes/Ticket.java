@@ -96,10 +96,13 @@ public class Ticket {
         cats.append("]");
 
         return String.format(
-                "{\"ticketId\":\"%s\",\"discordThreadId\":\"%s\",\"title\":\"%s\",\"description\":\"%s\",\"status\":\"%s\",\"prUrl\":\"%s\",\"claimedBy\":\"%s\",\"closedBy\":\"%s\",\"priority\":\"%s\",\"categories\":%s,\"dateAdded\":\"%s\",\"dateClosed\":\"%s\"}",
+                "{\"ticketId\":\"%s\",\"discordThreadId\":\"%s\",\"title\":\"%s\",\"description\":\"%s\",\"status\":\"%s\",\"prUrl\":%s,\"claimedBy\":%s,\"closedBy\":%s,\"priority\":\"%s\",\"categories\":%s,\"dateAdded\":\"%s\",\"dateClosed\":%s}",
                 ticketId, discordThreadId, escapeJson(title), escapeJson(description), status,
-                prUrl != null ? prUrl : "", claimedBy != null ? claimedBy : "", closedBy != null ? closedBy : "",
-                priority, cats.toString(), date_added != null ? date_added : "", date_closed != null ? date_closed : ""
+                prUrl != null ? "\"" + prUrl + "\"" : "null",
+                claimedBy != null ? "\"" + claimedBy + "\"" : "null",
+                closedBy != null ? "\"" + closedBy + "\"" : "null",
+                priority, cats.toString(), date_added != null ? date_added : "",
+                date_closed != null ? "\"" + date_closed + "\"" : "null"
         );
     }
 
