@@ -2,6 +2,9 @@ package org.example.api;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Member;
+import org.example.commands.GeneralCommands;
 import org.example.database.Classes.LeaderboardEntry;
 import org.example.database.Classes.User;
 import org.example.database.TicketRepository;
@@ -20,12 +23,18 @@ import java.util.regex.Pattern;
 
 public class UserController implements HttpHandler {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+    private final long guildId;
+    private final JDA jda;
     private final UserService userService;
     private final TicketRepository ticketRepository;
+    private final GeneralCommands generalCommands;
 
-    public UserController(UserService userService, TicketRepository ticketRepository) {
+    public UserController(long guildId, JDA jda, UserService userService, TicketRepository ticketRepository, GeneralCommands generalCommands) {
+        this.guildId = guildId;
+        this.jda = jda;
         this.userService = userService;
         this.ticketRepository = ticketRepository;
+        this.generalCommands = generalCommands;
     }
 
     @Override
@@ -90,9 +99,22 @@ public class UserController implements HttpHandler {
             sendResponse(exchange, 400, "{\"error\":\"role is required\"}");
             return;
         }
+
+        net.dv8tion.jda.api.entities.Guild guild = jda.getGuildById(guildId);
+        if (guild != null) {
+            Member member = guild.getMemberById(userId);
+            if (member != null) {
+                generalCommands.performSetRole(guild, member, role, msg -> {
+                    logger.info("REST API Role update for {}: {}", userId, msg);
+                });
+                sendResponse(exchange, 200, "{\"message\":\"User role updated successfully (Synced with Discord)\"}");
+                return;
+            }
+        }
+
         userService.setUserRole(userId, role);
-        logger.info("Updated role for user {} to {}", userId, role);
-        sendResponse(exchange, 200, "{\"message\":\"User role updated successfully\"}");
+        logger.info("Updated role for user {} to {} (DB only)", userId, role);
+        sendResponse(exchange, 200, "{\"message\":\"User role updated successfully (DB only)\"}");
     }
 
     private long extractId(String path) {

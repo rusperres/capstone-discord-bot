@@ -22,16 +22,17 @@ public class QACommands {
         Member member = event.getMember();
         if (member == null) return;
 
-        String currentName = thread.getName();
-        String cleanName = currentName.replaceAll("\\[.*?\\]", "").trim();
-        String newName = "[REVIEWED] " + cleanName;
+        performReviewed(thread, member);
+        event.reply("🧪 Ticket approved by QA: " + member.getAsMention() + ". Great job!").queue();
+    }
 
+    public void performReviewed(ThreadChannel thread, Member member) {
+        String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
+        String newName = "[REVIEWED] " + cleanName;
         thread.getManager().setName(newName).queue();
 
         ticketService.updateThreadStatus(thread.getIdLong(), "REVIEWED");
         ticketService.incrementQaScore(member.getIdLong());
-
-        event.reply("🧪 Ticket approved by QA: " + member.getAsMention() + ". Great job!").queue();
     }
 
     public void handleUnreview(SlashCommandInteractionEvent event) {
@@ -44,16 +45,16 @@ public class QACommands {
         Member member = event.getMember();
         if (member == null) return;
 
-        // 1. Rename back to [PENDING-REVIEW]
+        performUnreview(thread, member);
+        event.reply("⚠️ Review status removed. Ticket set back to [PENDING-REVIEW].").queue();
+    }
+
+    public void performUnreview(ThreadChannel thread, Member member) {
         String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
         String newName = "[PENDING-REVIEW] " + cleanName;
-
         thread.getManager().setName(newName).queue();
 
-        // 2. Update Database & Decrement Score
         ticketService.updateThreadStatus(thread.getIdLong(), "PENDING-REVIEW");
         ticketService.decrementQaScore(member.getIdLong());
-
-        event.reply("⚠️ Review status removed. Ticket set back to [PENDING-REVIEW].").queue();
     }
 }
