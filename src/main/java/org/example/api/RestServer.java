@@ -7,6 +7,8 @@ import org.example.commands.GeneralCommands;
 import org.example.commands.QACommands;
 import org.example.database.TicketRepository;
 import org.example.services.AuthService;
+import org.example.services.TicketLoader;
+import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.example.services.UserService;
 import org.slf4j.Logger;
@@ -27,9 +29,11 @@ public class RestServer {
     private final DevCommands devCommands;
     private final QACommands qaCommands;
     private final AuthService authService;
+    private final TicketLoader ticketLoader;
+    private final TicketMarkdownParser ticketMarkdownParser;
     private HttpServer server;
 
-    public RestServer(int port, long guildId, JDA jda, TicketService ticketService, UserService userService, TicketRepository ticketRepository, GeneralCommands general, DevCommands dev, QACommands qa, AuthService authService) {
+    public RestServer(int port, long guildId, JDA jda, TicketService ticketService, UserService userService, TicketRepository ticketRepository, GeneralCommands general, DevCommands dev, QACommands qa, AuthService authService, TicketLoader ticketLoader, TicketMarkdownParser ticketMarkdownParser) {
         this.port = port;
         this.guildId = guildId;
         this.jda = jda;
@@ -40,12 +44,14 @@ public class RestServer {
         this.devCommands = dev;
         this.qaCommands = qa;
         this.authService = authService;
+        this.ticketLoader = ticketLoader;
+        this.ticketMarkdownParser = ticketMarkdownParser;
     }
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(port), 0);
         
-        TicketController ticketController = new TicketController(guildId, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService);
+        TicketController ticketController = new TicketController(guildId, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService, ticketLoader, ticketMarkdownParser);
         UserController userController = new UserController(guildId, jda, userService, ticketRepository, generalCommands, authService);
         AuthController authController = new AuthController(authService, userService);
 

@@ -182,8 +182,8 @@ public class TicketRepository {
             pstmt.setString(7, ticket.getDate_added());
             pstmt.setString(8, ticket.getDate_closed());
             pstmt.setString(9, ticket.getPrUrl());
-            pstmt.setString(10, ticket.getClaimedBy());
-            pstmt.setString(11, ticket.getClosedBy());
+            pstmt.setString(10, ticket.getClaimedBy() != null && !ticket.getClaimedBy().trim().isEmpty() ? ticket.getClaimedBy() : null);
+            pstmt.setString(11, ticket.getClosedBy() != null && !ticket.getClosedBy().trim().isEmpty() ? ticket.getClosedBy() : null);
 
             // 1. Save the main ticket row
             boolean isSaved = pstmt.executeUpdate() > 0;
@@ -320,38 +320,28 @@ public class TicketRepository {
      * If it doesn't, creates a new one and returns the new ID.
      */
     private String getOrCreateCategory(String categoryName) {
-        String categoryId = null;
-
-        // 1. Try to find the existing category
-        String checkSql = "SELECT category_id FROM ticket_category WHERE category_name = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(checkSql)) {
-            pstmt.setString(1, categoryName);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                categoryId = rs.getString("category_id");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        // 2. If we found it, return the ID immediately
-        if (categoryId != null) {
-            return categoryId;
-        }
-
-        // 3. If it doesn't exist, generate a new ID and save it!
-        categoryId =  java.util.UUID.randomUUID().toString();
-        String insertSql = "INSERT INTO ticket_category (category_id, category_name) VALUES (?, ?)";
-
+        // Speculatively insert to avoid race conditions across multiple worker threads
+        String insertSql = "INSERT OR IGNORE INTO ticket_category (category_id, category_name) VALUES (?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(insertSql)) {
-            pstmt.setString(1, categoryId);
+            pstmt.setString(1, java.util.UUID.randomUUID().toString());
             pstmt.setString(2, categoryName);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-        return categoryId;
+        // Must exist now, just retrieve its ID
+        String checkSql = "SELECT category_id FROM ticket_category WHERE category_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(checkSql)) {
+            pstmt.setString(1, categoryName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("category_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**

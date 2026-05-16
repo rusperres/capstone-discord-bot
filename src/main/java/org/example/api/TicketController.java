@@ -11,6 +11,8 @@ import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
 import org.example.database.TicketRepository;
 import org.example.services.AuthService;
+import org.example.services.TicketLoader;
+import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +20,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Matcher;
@@ -33,8 +37,10 @@ public class TicketController implements HttpHandler {
     private final QACommands qaCommands;
     private final GeneralCommands generalCommands;
     private final AuthService authService;
+    private final TicketLoader ticketLoader;
+    private final TicketMarkdownParser ticketMarkdownParser;
 
-    public TicketController(long guildId, JDA jda, TicketService ticketService, TicketRepository ticketRepository, DevCommands devCommands, QACommands qaCommands, GeneralCommands generalCommands, AuthService authService) {
+    public TicketController(long guildId, JDA jda, TicketService ticketService, TicketRepository ticketRepository, DevCommands devCommands, QACommands qaCommands, GeneralCommands generalCommands, AuthService authService, TicketLoader ticketLoader, TicketMarkdownParser ticketMarkdownParser) {
         this.jda = jda;
         this.ticketService = ticketService;
         this.ticketRepository = ticketRepository;
@@ -42,6 +48,8 @@ public class TicketController implements HttpHandler {
         this.qaCommands = qaCommands;
         this.generalCommands = generalCommands;
         this.authService = authService;
+        this.ticketLoader = ticketLoader;
+        this.ticketMarkdownParser = ticketMarkdownParser;
     }
 
     @Override
@@ -59,6 +67,8 @@ public class TicketController implements HttpHandler {
         try {
             if ("GET".equals(method) && "/api/tickets/list".equals(path)) {
                 handleListTickets(exchange);
+            } else if ("POST".equals(method) && "/api/tickets/load".equals(path)) {
+                handleLoadTickets(exchange);
             } else if ("GET".equals(method) && path.matches("/api/tickets/\\d+")) {
                 handleGetTicket(exchange, path);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/\\d+/claim")) {
@@ -100,6 +110,68 @@ public class TicketController implements HttpHandler {
         } else {
             sendResponse(exchange, 404, "{\"error\":\"Ticket not found\"}");
         }
+    }
+
+    private void handleLoadTickets(HttpExchange exchange) throws IOException {
+        String body = readBody(exchange);
+        String folderName = extractStringFromJson(body, "folder");
+        long channelId = extractLongFromJson(body, "channelId");
+
+        if (folderName.isEmpty() || channelId == 0) {
+            sendResponse(exchange, 400, "{\"error\":\"folder and channelId are required\"}");
+            return;
+        }
+
+        net.dv8tion.jda.api.entities.channel.concrete.TextChannel channel = jda.getTextChannelById(channelId);
+        if (channel == null) {
+            sendResponse(exchange, 400, "{\"error\":\"Invalid channelId\"}");
+            return;
+        }
+
+        try {
+            List<Path> files = ticketLoader.getMarkdownFiles(folderName);
+            int loadedCount = 0;
+
+            for (Path file : files) {
+                String fileName = file.getFileName().toString();
+                if (ticketService.isTicketLoaded(fileName)) continue;
+
+                Ticket ticket = ticketMarkdownParser.parse(file);
+                String title = ticket.getTitle();
+                String content = ticket.getDescription();
+
+                channel.createThreadChannel("[OPEN] " + title)
+                        .setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_1_HOUR)
+                        .queue(thread -> {
+                            List<String> sections = buildSectionMessages(content);
+                            for (String section : sections) {
+                                thread.sendMessage(section).queue();
+                            }
+                            ticketService.addThread(ticket);
+                            ticketService.markTicketLoaded(fileName);
+                        });
+                loadedCount++;
+            }
+            sendResponse(exchange, 200, "{\"message\":\"Loaded " + loadedCount + " new tickets.\"}");
+        } catch (IOException e) {
+            logger.error("Error loading tickets", e);
+            sendResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
+        }
+    }
+
+    private List<String> buildSectionMessages(String content) {
+        List<String> messages = new ArrayList<>();
+        if (content.length() < 2000) {
+            messages.add(content);
+        } else {
+            int start = 0;
+            while (start < content.length()) {
+                int end = Math.min(start + 1900, content.length());
+                messages.add(content.substring(start, end));
+                start = end;
+            }
+        }
+        return messages;
     }
 
     private void handleClaimTicket(HttpExchange exchange, String path) throws IOException {

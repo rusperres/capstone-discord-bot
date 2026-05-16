@@ -90,6 +90,19 @@ Ensure the `sessionId` cookie is present for the requests below. If not, they wi
 
 Assume `{{TICKET_ID}}` is the Discord Thread ID for the ticket.
 
+**0. Load Tickets via API**
+- **Method:** `POST`
+- **URL:** `{{BASE_URL}}/tickets/load`
+- **Body (raw JSON):**
+```json
+{
+  "folder": "test",
+  "channelId": 123456789012345678
+}
+```
+*(Replace `123456789012345678` with a valid channel ID accessible to your bot)*
+- **Expected Result:** `200 OK` with `{"message":"Loaded X new tickets."}`
+
 **1. List All Active Tickets**
 - **Method:** `GET`
 - **URL:** `{{BASE_URL}}/tickets/list`

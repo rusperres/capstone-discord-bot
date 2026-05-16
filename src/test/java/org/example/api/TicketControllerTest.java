@@ -9,6 +9,8 @@ import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
 import org.example.database.TicketRepository;
 import org.example.services.AuthService;
+import org.example.services.TicketLoader;
+import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,12 +53,18 @@ public class TicketControllerTest {
     @Mock
     private AuthService authService;
 
+    @Mock
+    private TicketLoader ticketLoader;
+
+    @Mock
+    private TicketMarkdownParser ticketMarkdownParser;
+
     private TicketController ticketController;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        ticketController = new TicketController(123L, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService);
+        ticketController = new TicketController(123L, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService, ticketLoader, ticketMarkdownParser);
 
         // Mock a valid session for all tests
         Headers requestHeaders = new Headers();

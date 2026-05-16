@@ -60,6 +60,15 @@ Updates a user's role. This synchronizes the DB and assigns the role in the conn
 
 ## Ticket Endpoints ([TicketController](file:///mnt/data/Workspaces/Projects/capstone-discord-bot/src/main/java/org/example/api/TicketController.java#27-253))
 
+### `POST /tickets/load`
+Parses Markdown tickets from a specified folder, saves them to the database, and creates corresponding Discord threads in a targeted text channel.
+- **Request Body (JSON):**
+  - `folder` (required): The relative folder name where ticket Markdown files are stored (e.g., `"tickets"`).
+  - `channelId` (required): The numeric Discord Text Channel ID where the ticket threads will be created. Example body: `{"folder": "tickets", "channelId": 1234567890123456}`.
+- **Response:**
+  - `200 OK`: JSON success message indicating the number of tickets loaded.
+  - `400 Bad Request`: Validation failure for missing folder, or invalid channelId.
+
 ### `GET /tickets/list`
 Retrieves a list of all active tickets (tickets that do not have `CLOSED` status).
 - **Response:**
