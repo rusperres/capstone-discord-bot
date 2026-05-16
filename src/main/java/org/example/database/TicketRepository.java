@@ -161,26 +161,31 @@ public class TicketRepository {
      */
     public List<User> getLeaderboard(String type, int limit) {
         List<User> topUsers = new ArrayList<>();
+        String dbRole = type.equalsIgnoreCase("DEV") ? "DEVELOPER" : "QA";
         String sql = """
-            SELECT u.user_id, u.username, l.score 
-            FROM leaderboard_scores l
-            JOIN users u ON l.user_id = u.user_id
-            WHERE l.score_type = ?
-            ORDER BY l.score DESC
+            SELECT u.user_id, u.username, COALESCE(l.score, 0) as score, ur.role_name
+            FROM users u
+            JOIN user_roles ur ON u.user_id = ur.user_id
+            LEFT JOIN leaderboard_scores l ON u.user_id = l.user_id AND l.score_type = ?
+            WHERE ur.role_name = ?
+            ORDER BY score DESC
             LIMIT ?;
             """;
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, type.toUpperCase()); // Ensure it matches 'DEV' or 'QA'
-            pstmt.setInt(2, limit);
+            pstmt.setString(1, type.toUpperCase()); // Ensure it matches 'DEV' or 'QA' in leaderboard_scores
+            pstmt.setString(2, dbRole);
+            pstmt.setInt(3, limit);
             ResultSet rs = pstmt.executeQuery();
 
             while (rs.next()) {
+                String dbRoleName = rs.getString("role_name");
+                String humanRole = "DEVELOPER".equalsIgnoreCase(dbRoleName) ? "Developer" : "QA";
                 // We create a partial profile just for the leaderboard view
                 User profile = new User(
                         rs.getString("user_id"),
                         rs.getString("username"),
-                        null, // Role isn't strictly needed for the leaderboard
+                        humanRole,
                         type.equalsIgnoreCase("DEV") ? rs.getInt("score") : 0,
                         type.equalsIgnoreCase("QA") ? rs.getInt("score") : 0
                 );
@@ -416,7 +421,7 @@ public class TicketRepository {
      */
     public List<Ticket> getAllActiveTickets() {
         List<Ticket> activeTickets = new ArrayList<>();
-        String sql = "SELECT * FROM tickets WHERE status != 'CLOSED'";
+        String sql = "SELECT * FROM tickets";
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             ResultSet rs = pstmt.executeQuery();
@@ -588,7 +593,7 @@ public class TicketRepository {
             INSERT INTO leaderboard_scores (user_id, score_type, score) 
             VALUES (?, ?, ?)
             ON CONFLICT(user_id, score_type) DO UPDATE SET 
-            score = score + excluded.score;
+            score = MAX(0, score + excluded.score);
             """;
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, String.valueOf(userId));

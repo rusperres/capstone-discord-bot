@@ -36,6 +36,7 @@ public class GeneralCommands {
         // Configuration for roles: Shorthand -> {Discord Name, DB Name}
         java.util.Map<String, String[]> roleMap = new java.util.HashMap<>();
         roleMap.put("PM", new String[]{"Project Manager", "PROJECT_MANAGER"});
+        roleMap.put("Project Manager", new String[]{"Project Manager", "PROJECT_MANAGER"});
         roleMap.put("Developer", new String[]{"Developer", "DEVELOPER"});
         roleMap.put("QA", new String[]{"QA", "QA"});
 

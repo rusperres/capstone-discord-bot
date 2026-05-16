@@ -81,15 +81,15 @@ public class TicketController implements HttpHandler {
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/resolve")) {
                 handleResolveTicket(exchange, path);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/unresolve")) {
-                handleUpdateStatus(exchange, path, "UNRESOLVE");
+                handleUpdateStatus(exchange, path, "UNRESOLVE", session);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/unreview")) {
-                handleUpdateStatus(exchange, path, "UNREVIEW");
+                handleUpdateStatus(exchange, path, "UNREVIEW", session);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/close")) {
-                handleUpdateStatus(exchange, path, "CLOSED");
+                handleUpdateStatus(exchange, path, "CLOSED", session);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/review")) {
-                handleUpdateStatus(exchange, path, "REVIEWED");
+                handleUpdateStatus(exchange, path, "REVIEWED", session);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/demote")) {
-                handleUpdateStatus(exchange, path, "OPEN");
+                handleUpdateStatus(exchange, path, "OPEN", session);
             } else if ("GET".equals(method) && "/api/tickets/folders".equals(path)) {
                 handleListFolders(exchange);
             } else {
@@ -354,7 +354,7 @@ public class TicketController implements HttpHandler {
         sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review (DB only)\"}");
     }
 
-    private void handleUpdateStatus(HttpExchange exchange, String path, String status) throws IOException {
+    private void handleUpdateStatus(HttpExchange exchange, String path, String status, AuthService.UserSession session) throws IOException {
         String rawId = extractRawId(path);
 
         Ticket ticket = findTicket(rawId);
@@ -366,11 +366,9 @@ public class TicketController implements HttpHandler {
                     generalCommands.performClosed(thread);
                     break;
                 case "REVIEWED":
-                    if (ticket != null && ticket.getClaimedBy() != null) {
-                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
-                        if (member != null) {
-                            qaCommands.performReviewed(thread, member);
-                        }
+                    Member reviewMember = thread.getGuild().getMemberById(session.userId);
+                    if (reviewMember != null) {
+                        qaCommands.performReviewed(thread, reviewMember);
                     }
                     break;
                 case "OPEN":
@@ -385,11 +383,9 @@ public class TicketController implements HttpHandler {
                     }
                     break;
                 case "UNREVIEW":
-                    if (ticket != null && ticket.getClaimedBy() != null) {
-                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
-                        if (member != null) {
-                            qaCommands.performUnreview(thread, member);
-                        }
+                    Member unreviewMember = thread.getGuild().getMemberById(session.userId);
+                    if (unreviewMember != null) {
+                        qaCommands.performUnreview(thread, unreviewMember);
                     }
                     break;
             }
