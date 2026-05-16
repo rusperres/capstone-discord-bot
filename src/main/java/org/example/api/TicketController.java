@@ -88,6 +88,8 @@ public class TicketController implements HttpHandler {
                 handleUpdateStatus(exchange, path, "CLOSED", session);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/review")) {
                 handleUpdateStatus(exchange, path, "REVIEWED", session);
+            } else if ("GET".equals(method) && "/api/stats".equals(path)) {
+                handleGetStats(exchange);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/demote")) {
                 handleUpdateStatus(exchange, path, "OPEN", session);
             } else if ("GET".equals(method) && "/api/tickets/folders".equals(path)) {
@@ -352,6 +354,17 @@ public class TicketController implements HttpHandler {
         }
         logger.info("Ticket {} resolved with PR {} (DB only)", rawId, prUrl);
         sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review (DB only)\"}");
+    }
+
+    private void handleGetStats(HttpExchange exchange) throws IOException {
+        java.util.Map<String, Integer> stats = ticketRepository.getGlobalStats();
+        StringBuilder json = new StringBuilder("{");
+        json.append("\"totalUsers\":").append(stats.getOrDefault("totalUsers", 0)).append(",");
+        json.append("\"activeUsers\":").append(stats.getOrDefault("activeUsers", 0)).append(",");
+        json.append("\"activeTickets\":").append(stats.getOrDefault("activeTickets", 0)).append(",");
+        json.append("\"closedTickets\":").append(stats.getOrDefault("closedTickets", 0));
+        json.append("}");
+        sendResponse(exchange, 200, json.toString());
     }
 
     private void handleUpdateStatus(HttpExchange exchange, String path, String status, AuthService.UserSession session) throws IOException {
