@@ -14,6 +14,10 @@ public class TicketLoader {
         this.rootDirectory = rootDirectory;
     }
 
+    public String getTicketsDir() {
+        return rootDirectory;
+    }
+
     public List<Path> getMarkdownFiles(String folderName) throws IOException {
         Path folderPath = Paths.get(rootDirectory, folderName);
 

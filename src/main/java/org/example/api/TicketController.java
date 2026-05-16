@@ -80,12 +80,18 @@ public class TicketController implements HttpHandler {
                 handleClaimTicket(exchange, path);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/resolve")) {
                 handleResolveTicket(exchange, path);
+            } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/unresolve")) {
+                handleUpdateStatus(exchange, path, "UNRESOLVE");
+            } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/unreview")) {
+                handleUpdateStatus(exchange, path, "UNREVIEW");
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/close")) {
                 handleUpdateStatus(exchange, path, "CLOSED");
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/review")) {
                 handleUpdateStatus(exchange, path, "REVIEWED");
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/demote")) {
                 handleUpdateStatus(exchange, path, "OPEN");
+            } else if ("GET".equals(method) && "/api/tickets/folders".equals(path)) {
+                handleListFolders(exchange);
             } else {
                 logger.warn("Route not found: {} {}", method, path);
                 sendResponse(exchange, 404, "{\"error\":\"Not Found\"}");
@@ -370,6 +376,22 @@ public class TicketController implements HttpHandler {
                 case "OPEN":
                     devCommands.performUnclaim(thread);
                     break;
+                case "UNRESOLVE":
+                    if (ticket != null && ticket.getClaimedBy() != null) {
+                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                        if (member != null) {
+                            devCommands.performUnresolve(thread, member);
+                        }
+                    }
+                    break;
+                case "UNREVIEW":
+                    if (ticket != null && ticket.getClaimedBy() != null) {
+                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                        if (member != null) {
+                            qaCommands.performUnreview(thread, member);
+                        }
+                    }
+                    break;
             }
             logger.info("Ticket {} status updated to {} via REST API (Discord synced)", rawId, status);
         } else {
@@ -383,6 +405,22 @@ public class TicketController implements HttpHandler {
         }
 
         sendResponse(exchange, 200, "{\"message\":\"Ticket status updated to " + status + "\"}");
+    }
+
+    private void handleListFolders(HttpExchange exchange) throws IOException {
+        String ticketsDir = ticketLoader.getTicketsDir();
+        java.io.File file = new java.io.File(ticketsDir);
+        String[] directories = file.list((current, name) -> new java.io.File(current, name).isDirectory());
+
+        StringBuilder json = new StringBuilder("[");
+        if (directories != null) {
+            for (int i = 0; i < directories.length; i++) {
+                json.append("\"").append(directories[i]).append("\"");
+                if (i < directories.length - 1) json.append(",");
+            }
+        }
+        json.append("]");
+        sendResponse(exchange, 200, json.toString());
     }
 
     /**
