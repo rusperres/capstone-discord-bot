@@ -103,6 +103,18 @@ Assume `{{TICKET_ID}}` is the Discord Thread ID for the ticket.
 *(Replace `123456789012345678` with a valid channel ID accessible to your bot)*
 - **Expected Result:** `200 OK` with `{"message":"Loaded X new tickets."}`
 
+**0.5. Rebuild Database from Discord Threads**
+- **Method:** `POST`
+- **URL:** `{{BASE_URL}}/tickets/rebuild`
+- **Body (raw JSON):**
+```json
+{
+  "channelId": 123456789012345678
+}
+```
+*(Scans the given channel's threads and rebuilds ticket records in the DB from their names/statuses)*
+- **Expected Result:** `200 OK` with `{"message":"Database rebuilt from X threads."}`
+
 **1. List All Active Tickets**
 - **Method:** `GET`
 - **URL:** `{{BASE_URL}}/tickets/list`

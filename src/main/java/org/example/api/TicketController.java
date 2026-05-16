@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import org.example.commands.DevCommands;
 import org.example.commands.GeneralCommands;
@@ -69,6 +70,8 @@ public class TicketController implements HttpHandler {
                 handleListTickets(exchange);
             } else if ("POST".equals(method) && "/api/tickets/load".equals(path)) {
                 handleLoadTickets(exchange);
+            } else if ("POST".equals(method) && "/api/tickets/rebuild".equals(path)) {
+                handleRebuildDb(exchange);
             } else if ("GET".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+")) {
                 handleGetTicket(exchange, path);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/claim")) {
@@ -136,15 +139,28 @@ public class TicketController implements HttpHandler {
         try {
             List<Path> files = ticketLoader.getMarkdownFiles(folderName);
             int loadedCount = 0;
+            int enrichedCount = 0;
 
             for (Path file : files) {
                 String fileName = file.getFileName().toString();
-                if (ticketService.isTicketLoaded(fileName)) continue;
 
                 Ticket ticket = ticketMarkdownParser.parse(file);
                 String title = ticket.getTitle();
                 String content = ticket.getDescription();
 
+                // Check if a ticket with this title already exists (e.g. from a prior rebuild)
+                Ticket existing = ticketService.findTicketByTitle(title);
+                if (existing != null) {
+                    // Enrich the existing record with description (don't create a new thread)
+                    ticketService.updateTicketDescription(existing.getTicketId(), content, existing.getDiscordThreadId());
+                    ticketService.markTicketLoaded(fileName);
+                    enrichedCount++;
+                    continue;
+                }
+
+                if (ticketService.isTicketLoaded(fileName)) continue;
+
+                // No existing record — create a new Discord thread
                 channel.createThreadChannel("[OPEN] " + title)
                         .setAutoArchiveDuration(ThreadChannel.AutoArchiveDuration.TIME_1_HOUR)
                         .queue(thread -> {
@@ -152,12 +168,13 @@ public class TicketController implements HttpHandler {
                             for (String section : sections) {
                                 thread.sendMessage(section).queue();
                             }
+                            ticket.setDiscordThreadId(String.valueOf(thread.getIdLong()));
                             ticketService.addThread(ticket);
                             ticketService.markTicketLoaded(fileName);
                         });
                 loadedCount++;
             }
-            sendResponse(exchange, 200, "{\"message\":\"Loaded " + loadedCount + " new tickets.\"}");
+            sendResponse(exchange, 200, "{\"message\":\"Loaded " + loadedCount + " new tickets, enriched " + enrichedCount + " existing.\"}" );
         } catch (IOException e) {
             logger.error("Error loading tickets", e);
             sendResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
@@ -179,6 +196,54 @@ public class TicketController implements HttpHandler {
         return messages;
     }
 
+    private void handleRebuildDb(HttpExchange exchange) throws IOException {
+        String body = readBody(exchange);
+        long channelId = extractLongFromJson(body, "channelId");
+
+        if (channelId == 0) {
+            sendResponse(exchange, 400, "{\"error\":\"channelId is required\"}");
+            return;
+        }
+
+        TextChannel channel = jda.getTextChannelById(channelId);
+        if (channel == null) {
+            sendResponse(exchange, 400, "{\"error\":\"Invalid channelId\"}");
+            return;
+        }
+
+        List<ThreadChannel> threads = channel.getThreadChannels();
+
+        // Clear all existing ticket data for a clean rebuild
+        ticketService.deleteAllTickets();
+        logger.info("Cleared all existing ticket data for rebuild");
+
+        // Deduplicate: keep only the latest thread per unique title
+        // (thread list from JDA is ordered oldest-first, so later entries overwrite earlier ones)
+        java.util.Map<String, ThreadChannel> latestByTitle = new java.util.LinkedHashMap<>();
+        for (ThreadChannel thread : threads) {
+            String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
+            latestByTitle.put(cleanName.toLowerCase(), thread); // overwrite older duplicates
+        }
+
+        int rebuilt = 0;
+        for (java.util.Map.Entry<String, ThreadChannel> entry : latestByTitle.entrySet()) {
+            ThreadChannel thread = entry.getValue();
+            String name = thread.getName();
+            String status = "OPEN";
+            if (name.contains("[CLAIMED]")) status = "CLAIMED";
+            else if (name.contains("[PENDING-REVIEW]")) status = "PENDING-REVIEW";
+            else if (name.contains("[REVIEWED]")) status = "REVIEWED";
+            else if (name.contains("[CLOSED]")) status = "CLOSED";
+
+            String cleanName = name.replaceAll("\\[.*?\\]", "").trim();
+            ticketService.addThread(thread.getIdLong(), cleanName, status);
+            rebuilt++;
+        }
+
+        logger.info("Database rebuilt from {} unique threads in channel {} ({} total threads scanned)", rebuilt, channelId, threads.size());
+        sendResponse(exchange, 200, "{\"message\":\"Database rebuilt from " + rebuilt + " unique tickets (" + threads.size() + " threads scanned).\"}" );
+    }
+
     private void handleClaimTicket(HttpExchange exchange, String path) throws IOException {
         String rawId = extractRawId(path);
         String body = readBody(exchange);
@@ -188,28 +253,29 @@ public class TicketController implements HttpHandler {
             return;
         }
 
-        if (isNumeric(rawId)) {
-            long ticketId = Long.parseLong(rawId);
-            ThreadChannel thread = jda.getThreadChannelById(ticketId);
-            if (thread != null) {
-                Member member = thread.getGuild().getMemberById(userId);
-                if (member != null) {
-                    devCommands.performClaim(thread, member);
-                    logger.info("Ticket {} claimed by user {} via REST API", ticketId, userId);
-                    sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
-                    return;
-                }
+        Ticket ticket = findTicket(rawId);
+        ThreadChannel thread = resolveThread(ticket, rawId);
+
+        if (thread != null) {
+            Member member = thread.getGuild().getMemberById(userId);
+            if (member != null) {
+                devCommands.performClaim(thread, member);
+                logger.info("Ticket {} claimed by user {} via REST API (Discord synced)", rawId, userId);
+                sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
+                return;
             }
-            // Fallback for numeric ID
-            ticketService.assignDeveloper(ticketId, userId);
-            ticketService.updateThreadStatus(ticketId, "CLAIMED");
+        }
+
+        // DB-only fallback
+        if (isNumeric(rawId)) {
+            ticketService.assignDeveloper(Long.parseLong(rawId), userId);
+            ticketService.updateThreadStatus(Long.parseLong(rawId), "CLAIMED");
         } else {
-            // UUID-based ticket (no Discord thread)
             ticketService.assignDeveloperByTicketId(rawId, userId);
             ticketService.updateTicketStatusByTicketId(rawId, "CLAIMED");
         }
         logger.info("Ticket {} claimed by user {} (DB only)", rawId, userId);
-        sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
+        sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully (DB only)\"}");
     }
 
     private void handleResolveTicket(HttpExchange exchange, String path) throws IOException {
@@ -221,22 +287,22 @@ public class TicketController implements HttpHandler {
             return;
         }
 
-        if (isNumeric(rawId)) {
-            long ticketId = Long.parseLong(rawId);
-            ThreadChannel thread = jda.getThreadChannelById(ticketId);
-            if (thread != null) {
-                Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
-                if (ticket != null && ticket.getClaimedBy() != null) {
-                    Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
-                    if (member != null) {
-                        devCommands.performResolved(thread, member, prUrl);
-                        logger.info("Ticket {} resolved with PR {} via REST API", ticketId, prUrl);
-                        sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review\"}");
-                        return;
-                    }
-                }
+        Ticket ticket = findTicket(rawId);
+        ThreadChannel thread = resolveThread(ticket, rawId);
+
+        if (thread != null && ticket != null && ticket.getClaimedBy() != null) {
+            Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+            if (member != null) {
+                devCommands.performResolved(thread, member, prUrl);
+                logger.info("Ticket {} resolved with PR {} via REST API (Discord synced)", rawId, prUrl);
+                sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review\"}");
+                return;
             }
-            ticketService.setPrUrl(ticketId, prUrl);
+        }
+
+        // DB-only fallback
+        if (isNumeric(rawId)) {
+            ticketService.setPrUrl(Long.parseLong(rawId), prUrl);
         } else {
             ticketService.setPrUrlByTicketId(rawId, prUrl);
         }
@@ -247,36 +313,71 @@ public class TicketController implements HttpHandler {
     private void handleUpdateStatus(HttpExchange exchange, String path, String status) throws IOException {
         String rawId = extractRawId(path);
 
-        if (isNumeric(rawId)) {
-            long ticketId = Long.parseLong(rawId);
-            ThreadChannel thread = jda.getThreadChannelById(ticketId);
-            if (thread != null) {
-                switch (status) {
-                    case "CLOSED":
-                        generalCommands.performClosed(thread);
-                        break;
-                    case "IN_REVIEW":
-                        Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
-                        if (ticket != null && ticket.getClaimedBy() != null) {
-                            Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
-                            if (member != null) {
-                                qaCommands.performUnreview(thread, member);
-                            }
+        Ticket ticket = findTicket(rawId);
+        ThreadChannel thread = resolveThread(ticket, rawId);
+
+        if (thread != null) {
+            switch (status) {
+                case "CLOSED":
+                    generalCommands.performClosed(thread);
+                    break;
+                case "IN_REVIEW":
+                    if (ticket != null && ticket.getClaimedBy() != null) {
+                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                        if (member != null) {
+                            qaCommands.performUnreview(thread, member);
                         }
-                        break;
-                    case "OPEN":
-                        devCommands.performUnclaim(thread);
-                        break;
-                }
-            } else {
-                ticketService.updateThreadStatus(ticketId, status);
+                    }
+                    break;
+                case "OPEN":
+                    devCommands.performUnclaim(thread);
+                    break;
             }
+            logger.info("Ticket {} status updated to {} via REST API (Discord synced)", rawId, status);
         } else {
-            ticketService.updateTicketStatusByTicketId(rawId, status);
+            // DB-only fallback
+            if (isNumeric(rawId)) {
+                ticketService.updateThreadStatus(Long.parseLong(rawId), status);
+            } else {
+                ticketService.updateTicketStatusByTicketId(rawId, status);
+            }
+            logger.info("Ticket {} status updated to {} (DB only)", rawId, status);
         }
 
-        logger.info("Ticket {} status updated to {} via REST API", rawId, status);
         sendResponse(exchange, 200, "{\"message\":\"Ticket status updated to " + status + "\"}");
+    }
+
+    /**
+     * Finds a ticket from the DB using either a numeric thread ID or UUID ticket ID.
+     */
+    private Ticket findTicket(String rawId) {
+        if (isNumeric(rawId)) {
+            return ticketRepository.findTicketByThreadId(Long.parseLong(rawId));
+        } else {
+            return ticketRepository.findTicketByTicketId(rawId);
+        }
+    }
+
+    /**
+     * Resolves the Discord ThreadChannel for a ticket.
+     * If rawId is numeric, tries it directly as a thread ID.
+     * Otherwise, looks up the ticket's discordThreadId from the DB.
+     */
+    private ThreadChannel resolveThread(Ticket ticket, String rawId) {
+        if (isNumeric(rawId)) {
+            return jda.getThreadChannelById(Long.parseLong(rawId));
+        }
+        // For UUID-based tickets, get the discord_thread_id from the ticket record
+        if (ticket != null && ticket.getDiscordThreadId() != null
+                && !ticket.getDiscordThreadId().equals("null")
+                && !ticket.getDiscordThreadId().isEmpty()) {
+            try {
+                return jda.getThreadChannelById(Long.parseLong(ticket.getDiscordThreadId()));
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid discordThreadId '{}' for ticket {}", ticket.getDiscordThreadId(), rawId);
+            }
+        }
+        return null;
     }
 
     private String extractRawId(String path) {

@@ -160,6 +160,52 @@ public class TicketRepository {
     /* ---------------------------------------------- TICKET METHODS -------------------------------------------*/
 
     /**
+     * Deletes all tickets and related data for a full rebuild.
+     */
+    public boolean deleteAllTickets() {
+        try {
+            connection.createStatement().executeUpdate("DELETE FROM ticket_category_map");
+            connection.createStatement().executeUpdate("DELETE FROM loaded_files");
+            connection.createStatement().executeUpdate("DELETE FROM tickets");
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Finds a ticket by its exact title (case-insensitive). Returns the first match.
+     */
+    public Ticket findTicketByTitle(String title) {
+        String sql = "SELECT * FROM tickets WHERE lower(title) = lower(?) LIMIT 1";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, title);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) return mapResultSetToTicket(rs);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Updates the description and discord_thread_id of an existing ticket (enrichment after rebuild).
+     */
+    public boolean updateTicketDescription(String ticketId, String description, String discordThreadId) {
+        String sql = "UPDATE tickets SET ticket_description = ?, discord_thread_id = ? WHERE ticket_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, description);
+            pstmt.setString(2, discordThreadId);
+            pstmt.setString(3, ticketId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Inserts a new ticket record and automatically processes its categories.
      */
     public boolean saveTicket(Ticket ticket) {

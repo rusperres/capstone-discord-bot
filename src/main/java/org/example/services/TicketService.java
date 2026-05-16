@@ -59,6 +59,18 @@ public class TicketService {
     public void markTicketLoaded(String fileName) {
         ticketRepository.markTicketLoaded(fileName);
     }
+    public boolean deleteAllTickets() {
+        return ticketRepository.deleteAllTickets();
+    }
+
+    public Ticket findTicketByTitle(String title) {
+        return ticketRepository.findTicketByTitle(title);
+    }
+
+    public boolean updateTicketDescription(String ticketId, String description, String discordThreadId) {
+        return ticketRepository.updateTicketDescription(ticketId, description, discordThreadId);
+    }
+
 // for rebuild
     public void addThread(long threadId, String title, String status) {
         Ticket ticket = new Ticket(
