@@ -211,8 +211,8 @@ public class TicketRepository {
     public boolean saveTicket(Ticket ticket) {
         String sql = """
             INSERT INTO tickets (ticket_id, discord_thread_id, title, ticket_description, 
-                                 status, priority, date_added, date_closed, pr_url, claimed_by, closed_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 status, priority, date_added, date_closed, pr_url) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
