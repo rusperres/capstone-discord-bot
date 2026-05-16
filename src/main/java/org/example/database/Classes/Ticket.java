@@ -85,5 +85,26 @@ public class Ticket {
     public void setClaimedBy(String claimedBy) { this.claimedBy = claimedBy; }
     public void setClosedBy(String closedBy) { this.closedBy = closedBy; }
 
+    public String toJson() {
+        StringBuilder cats = new StringBuilder("[");
+        if (categories != null) {
+            for (int i = 0; i < categories.size(); i++) {
+                cats.append("\"").append(escapeJson(categories.get(i))).append("\"");
+                if (i < categories.size() - 1) cats.append(",");
+            }
+        }
+        cats.append("]");
 
+        return String.format(
+                "{\"ticketId\":\"%s\",\"discordThreadId\":\"%s\",\"title\":\"%s\",\"description\":\"%s\",\"status\":\"%s\",\"prUrl\":\"%s\",\"claimedBy\":\"%s\",\"closedBy\":\"%s\",\"priority\":\"%s\",\"categories\":%s,\"dateAdded\":\"%s\",\"dateClosed\":\"%s\"}",
+                ticketId, discordThreadId, escapeJson(title), escapeJson(description), status,
+                prUrl != null ? prUrl : "", claimedBy != null ? claimedBy : "", closedBy != null ? closedBy : "",
+                priority, cats.toString(), date_added != null ? date_added : "", date_closed != null ? date_closed : ""
+        );
+    }
+
+    private String escapeJson(String input) {
+        if (input == null) return "";
+        return input.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+    }
 }

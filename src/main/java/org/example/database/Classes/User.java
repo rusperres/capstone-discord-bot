@@ -25,4 +25,16 @@ public class User {
     public String toString() {
         return String.format("%s (%s) - Dev: %d | QA: %d", username, roleName, devScore, qaScore);
     }
+
+    public String toJson() {
+        return String.format(
+                "{\"userId\":\"%s\",\"username\":\"%s\",\"roleName\":\"%s\",\"devScore\":%d,\"qaScore\":%d}",
+                userId, escapeJson(username), escapeJson(roleName), devScore, qaScore
+        );
+    }
+
+    private String escapeJson(String input) {
+        if (input == null) return "";
+        return input.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+    }
 }

@@ -11,6 +11,7 @@ import org.example.services.TicketLoader;
 import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.example.services.UserService;
+import org.example.api.RestServer;
 
 
 public class Main
@@ -57,6 +58,12 @@ public class Main
 
             System.out.println("🚀 Bot is online! Connected to " + jda.getGuilds().size() + " guild(s).");
             System.out.println("📌 Configured Guild ID: " + config.getGuildId());
+
+            // Start REST Server
+            int port = 8080; 
+            RestServer restServer = new RestServer(port, ticketService, userService, repository);
+            restServer.start();
+            System.out.println("🌐 REST API is listening on port " + port);
 
         } catch (Exception e) {
             e.printStackTrace();
