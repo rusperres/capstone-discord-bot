@@ -36,6 +36,8 @@ public class AuthController implements HttpHandler {
                 handleLogin(exchange, query);
             } else if ("GET".equals(method) && "/api/auth/callback".equals(path)) {
                 handleCallback(exchange, query);
+            } else if ("GET".equals(method) && "/api/auth/status".equals(path)) {
+                handleStatus(exchange, query);
             } else {
                 sendResponse(exchange, 404, "{\"error\":\"Not Found\"}");
             }
@@ -47,18 +49,34 @@ public class AuthController implements HttpHandler {
 
     private void handleLogin(HttpExchange exchange, String query) throws IOException {
         String userId = extractParam(query, "id");
-        if (userId == null) {
-            sendResponse(exchange, 400, "{\"error\":\"id parameter is required\"}");
-            return;
-        }
-
+        // User ID is now optional; if null, the callback will identify the user.
+        
         String sessionId = UUID.randomUUID().toString();
-        String state = authService.generateState(sessionId, userId);
+        String state = authService.generateState(sessionId, userId != null ? userId : "pending");
         String redirectUrl = authService.getOAuthUrl(state);
 
-        exchange.getResponseHeaders().set("Location", redirectUrl);
-        exchange.sendResponseHeaders(302, -1);
-        exchange.close();
+        // Return JSON instead of 302 to allow the Client to get the sessionId
+        String response = String.format("{\"url\":\"%s\",\"sessionId\":\"%s\"}", redirectUrl, sessionId);
+        sendResponse(exchange, 200, response);
+    }
+
+    private void handleStatus(HttpExchange exchange, String query) throws IOException {
+        String sessionId = extractParam(query, "sessionId");
+        String userId = extractParam(query, "id"); // Fallback
+
+        AuthService.UserSession session = null;
+        if (sessionId != null) {
+            session = authService.getSession(sessionId);
+        } else if (userId != null) {
+            String sid = authService.getSessionIdByUserId(userId);
+            if (sid != null) session = authService.getSession(sid);
+        }
+
+        if (session != null && session.authenticated) {
+            sendResponse(exchange, 200, String.format("{\"authenticated\":true,\"userId\":\"%s\",\"username\":\"%s\"}", session.userId, session.username));
+        } else {
+            sendResponse(exchange, 200, "{\"authenticated\":false}");
+        }
     }
 
     private void handleCallback(HttpExchange exchange, String query) throws IOException {
@@ -93,14 +111,19 @@ public class AuthController implements HttpHandler {
                 return;
             }
 
-            authService.createSession(sessionId, session);
+            // If the initial userId was 'pending', we update it with the real Discord ID
+            String finalUserId = "pending".equals(userId) ? session.discordId : userId;
+            AuthService.UserSession finalSession = new AuthService.UserSession(
+                finalUserId, session.discordId, session.username, session.avatar, session.accessToken
+            );
+            authService.createSession(sessionId, finalSession);
             
             // Persist the Discord username to our database
             try {
-                userService.updateUsername(Long.parseLong(userId), session.username);
-                System.out.println("Updated username for user " + userId + " to " + session.username);
+                userService.updateUsername(Long.parseLong(finalUserId), session.username);
+                System.out.println("Updated username for user " + finalUserId + " to " + session.username);
             } catch (NumberFormatException e) {
-                logger.warn("Could not update username for non-numeric userId: {}", userId);
+                logger.warn("Could not update username for non-numeric userId: {}", finalUserId);
             }
 
             // Set-Cookie: sessionId=abc123; HttpOnly; Secure; Path=/; SameSite=Lax
