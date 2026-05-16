@@ -11,6 +11,7 @@ import org.example.services.TicketLoader;
 import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.example.services.UserService;
+import org.example.services.AuthService;
 import org.example.api.RestServer;
 
 
@@ -32,6 +33,7 @@ public class Main
         TicketMarkdownParser ticketMarkdownParser = new TicketMarkdownParser();
         TicketService ticketService = new TicketService(repository);
         UserService userService = new UserService(repository);
+        AuthService authService = new AuthService(config);
 
         GeneralCommands general = new GeneralCommands(ticketService, userService);
         AdminCommands admin = new AdminCommands(ticketService, loader, ticketMarkdownParser);
@@ -61,7 +63,7 @@ public class Main
 
             // Start REST Server
             int port = 8080; 
-            RestServer restServer = new RestServer(port, config.getGuildId(), jda, ticketService, userService, repository, general, dev, qa);
+            RestServer restServer = new RestServer(port, config.getGuildId(), jda, ticketService, userService, repository, general, dev, qa, authService);
             restServer.start();
             System.out.println("🌐 REST API is listening on port " + port);
 

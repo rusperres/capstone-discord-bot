@@ -6,6 +6,7 @@ import org.example.commands.DevCommands;
 import org.example.commands.GeneralCommands;
 import org.example.commands.QACommands;
 import org.example.database.TicketRepository;
+import org.example.services.AuthService;
 import org.example.services.TicketService;
 import org.example.services.UserService;
 import org.slf4j.Logger;
@@ -25,9 +26,10 @@ public class RestServer {
     private final GeneralCommands generalCommands;
     private final DevCommands devCommands;
     private final QACommands qaCommands;
+    private final AuthService authService;
     private HttpServer server;
 
-    public RestServer(int port, long guildId, JDA jda, TicketService ticketService, UserService userService, TicketRepository ticketRepository, GeneralCommands general, DevCommands dev, QACommands qa) {
+    public RestServer(int port, long guildId, JDA jda, TicketService ticketService, UserService userService, TicketRepository ticketRepository, GeneralCommands general, DevCommands dev, QACommands qa, AuthService authService) {
         this.port = port;
         this.guildId = guildId;
         this.jda = jda;
@@ -37,6 +39,7 @@ public class RestServer {
         this.generalCommands = general;
         this.devCommands = dev;
         this.qaCommands = qa;
+        this.authService = authService;
     }
 
     public void start() throws IOException {
@@ -44,10 +47,12 @@ public class RestServer {
         
         TicketController ticketController = new TicketController(guildId, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands);
         UserController userController = new UserController(guildId, jda, userService, ticketRepository, generalCommands);
+        AuthController authController = new AuthController(authService);
 
         server.createContext("/api/tickets", ticketController);
         server.createContext("/api/profile", userController);
         server.createContext("/api/user", userController);
+        server.createContext("/api/auth", authController);
 
         server.setExecutor(null); // creates a default executor
         server.start();
