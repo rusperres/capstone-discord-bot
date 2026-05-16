@@ -68,6 +68,42 @@ public class TicketRepository {
      * Fetches a user's role and current points.
      * Returns a customized UserProfile object (defined at the bottom of this file).
      */
+    public boolean deleteUser(long userId) {
+        String stringId = String.valueOf(userId);
+        String deleteScoresSql = "DELETE FROM leaderboard_scores WHERE user_id = ?";
+        String deleteRolesSql = "DELETE FROM user_roles WHERE user_id = ?";
+        String deleteUserSql = "DELETE FROM users WHERE user_id = ?";
+
+        try {
+            connection.setAutoCommit(false);
+            try (PreparedStatement pstmtScores = connection.prepareStatement(deleteScoresSql);
+                 PreparedStatement pstmtRoles = connection.prepareStatement(deleteRolesSql);
+                 PreparedStatement pstmtUser = connection.prepareStatement(deleteUserSql)) {
+
+                pstmtScores.setString(1, stringId);
+                pstmtScores.executeUpdate();
+
+                pstmtRoles.setString(1, stringId);
+                pstmtRoles.executeUpdate();
+
+                pstmtUser.setString(1, stringId);
+                int deleted = pstmtUser.executeUpdate();
+
+                connection.commit();
+                return deleted > 0;
+            } catch (SQLException e) {
+                connection.rollback();
+                e.printStackTrace();
+                return false;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public User getUser(long userId) {
         String stringId = String.valueOf(userId);
         String sql = """

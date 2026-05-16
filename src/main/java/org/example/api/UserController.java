@@ -60,6 +60,8 @@ public class UserController implements HttpHandler {
                 handleMembers(exchange, query);
             } else if ("PATCH".equals(method) && path.matches("/api/user/\\d+")) {
                 handleUpdateRole(exchange, path);
+            } else if ("DELETE".equals(method) && path.matches("/api/user/\\d+")) {
+                handleDeleteUser(exchange, path);
             } else {
                 logger.warn("Route not found: {} {}", method, path);
                 sendResponse(exchange, 404, "{\"error\":\"Not Found\"}");
@@ -132,6 +134,18 @@ public class UserController implements HttpHandler {
         userService.setUserRole(userId, role);
         logger.info("Updated role for user {} to {} (DB only)", userId, role);
         sendResponse(exchange, 200, "{\"message\":\"User role updated successfully (DB only)\"}");
+    }
+
+    private void handleDeleteUser(HttpExchange exchange, String path) throws IOException {
+        long userId = extractId(path);
+        boolean deleted = ticketRepository.deleteUser(userId);
+        if (deleted) {
+            logger.info("Deleted user {} via REST API", userId);
+            sendResponse(exchange, 200, "{\"message\":\"User deleted successfully\"}");
+        } else {
+            logger.warn("Failed to delete user {} (not found or DB error)", userId);
+            sendResponse(exchange, 404, "{\"error\":\"User not found or could not be deleted\"}");
+        }
     }
 
     private long extractId(String path) {

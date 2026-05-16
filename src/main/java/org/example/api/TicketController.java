@@ -72,6 +72,8 @@ public class TicketController implements HttpHandler {
                 handleLoadTickets(exchange);
             } else if ("POST".equals(method) && "/api/tickets/rebuild".equals(path)) {
                 handleRebuildDb(exchange);
+            } else if ("POST".equals(method) && "/api/tickets".equals(path)) {
+                handleCreateTicket(exchange);
             } else if ("GET".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+")) {
                 handleGetTicket(exchange, path);
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/claim")) {
