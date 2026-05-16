@@ -51,6 +51,15 @@ public class AuthService {
         return authenticatedSessions.get(sessionId);
     }
 
+    public String getSessionIdByUserId(String userId) {
+        for (Map.Entry<String, UserSession> entry : authenticatedSessions.entrySet()) {
+            if (entry.getValue().userId.equals(userId)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
     public String getOAuthUrl(String state) {
         return "https://discord.com/api/oauth2/authorize" +
                 "?client_id=" + config.getDiscordClientId() +

@@ -52,10 +52,11 @@ public class TicketRepository {
     }
 
     public boolean updateUsername(long userId, String username) {
-        String sql = "UPDATE users SET username = ? WHERE user_id = ?";
+        String sql = "INSERT INTO users (user_id, username) VALUES (?, ?) " +
+                     "ON CONFLICT(user_id) DO UPDATE SET username = excluded.username";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, String.valueOf(userId));
+            pstmt.setString(1, String.valueOf(userId));
+            pstmt.setString(2, username);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
