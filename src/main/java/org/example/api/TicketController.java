@@ -10,6 +10,7 @@ import org.example.commands.GeneralCommands;
 import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
 import org.example.database.TicketRepository;
+import org.example.services.AuthService;
 import org.example.services.TicketService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,14 +32,16 @@ public class TicketController implements HttpHandler {
     private final DevCommands devCommands;
     private final QACommands qaCommands;
     private final GeneralCommands generalCommands;
+    private final AuthService authService;
 
-    public TicketController(long guildId, JDA jda, TicketService ticketService, TicketRepository ticketRepository, DevCommands devCommands, QACommands qaCommands, GeneralCommands generalCommands) {
+    public TicketController(long guildId, JDA jda, TicketService ticketService, TicketRepository ticketRepository, DevCommands devCommands, QACommands qaCommands, GeneralCommands generalCommands, AuthService authService) {
         this.jda = jda;
         this.ticketService = ticketService;
         this.ticketRepository = ticketRepository;
         this.devCommands = devCommands;
         this.qaCommands = qaCommands;
         this.generalCommands = generalCommands;
+        this.authService = authService;
     }
 
     @Override
@@ -46,6 +49,12 @@ public class TicketController implements HttpHandler {
         String method = exchange.getRequestMethod();
         String path = exchange.getRequestURI().getPath();
         logger.info("Received {} request for {}", method, path);
+
+        AuthService.UserSession session = validateSession(exchange);
+        if (session == null) {
+            sendResponse(exchange, 401, "{\"error\":\"Unauthorized - Invalid or missing sessionId\"}");
+            return;
+        }
 
         try {
             if ("GET".equals(method) && "/api/tickets/list".equals(path)) {
@@ -213,6 +222,23 @@ public class TicketController implements HttpHandler {
             return matcher.group(1);
         }
         return "";
+    }
+
+    private AuthService.UserSession validateSession(HttpExchange exchange) {
+        List<String> cookies = exchange.getRequestHeaders().get("Cookie");
+        if (cookies != null) {
+            for (String cookie : cookies) {
+                String[] parts = cookie.split(";");
+                for (String part : parts) {
+                    part = part.trim();
+                    if (part.startsWith("sessionId=")) {
+                        String sessionId = part.substring("sessionId=".length());
+                        return authService.getSession(sessionId);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {

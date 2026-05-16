@@ -7,6 +7,7 @@ import org.example.commands.GeneralCommands;
 import org.example.database.Classes.LeaderboardEntry;
 import org.example.database.Classes.User;
 import org.example.database.TicketRepository;
+import org.example.services.AuthService;
 import org.example.services.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,12 +41,22 @@ public class UserControllerTest {
     @Mock
     private HttpExchange exchange;
 
+    @Mock
+    private AuthService authService;
+
     private UserController userController;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        userController = new UserController(123L, jda, userService, ticketRepository, generalCommands);
+        userController = new UserController(123L, jda, userService, ticketRepository, generalCommands, authService);
+
+        // Mock a valid session for all tests
+        Headers requestHeaders = new Headers();
+        requestHeaders.add("Cookie", "sessionId=valid_session");
+        when(exchange.getRequestHeaders()).thenReturn(requestHeaders);
+        AuthService.UserSession mockSession = new AuthService.UserSession("123", "did", "username", "av", "token");
+        when(authService.getSession("valid_session")).thenReturn(mockSession);
     }
 
     @Test

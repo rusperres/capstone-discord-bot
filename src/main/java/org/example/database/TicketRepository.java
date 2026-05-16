@@ -25,26 +25,38 @@ public class TicketRepository {
         // Ensure the user exists in the main users table first
         String insertUserSql = "INSERT OR IGNORE INTO users (user_id, username) VALUES (?, 'Unknown')";
 
-        // Upsert their specific role
-        String upsertRoleSql = """
-            INSERT INTO user_roles (user_id, role_name) 
-            VALUES (?, ?)
-            ON CONFLICT(user_id, role_name) DO UPDATE SET 
-            role_name = excluded.role_name;
-            """;
+        String deleteOldRolesSql = "DELETE FROM user_roles WHERE user_id = ?";
+        String insertRoleSql = "INSERT INTO user_roles (user_id, role_name) VALUES (?, ?)";
 
         try (PreparedStatement pstmtUser = connection.prepareStatement(insertUserSql);
-             PreparedStatement pstmtRole = connection.prepareStatement(upsertRoleSql)) {
+             PreparedStatement pstmtDelete = connection.prepareStatement(deleteOldRolesSql);
+             PreparedStatement pstmtInsert = connection.prepareStatement(insertRoleSql)) {
 
             // 1. Insert user if missing
             pstmtUser.setString(1, stringId);
             pstmtUser.executeUpdate();
 
-            // 2. Assign/Update role
-            pstmtRole.setString(1, stringId);
-            pstmtRole.setString(2, role);
-            return pstmtRole.executeUpdate() > 0;
+            // 2. Remove any old roles to enforce 1 role per user constraint despite composite PK
+            pstmtDelete.setString(1, stringId);
+            pstmtDelete.executeUpdate();
 
+            // 3. Assign new role
+            pstmtInsert.setString(1, stringId);
+            pstmtInsert.setString(2, role);
+            return pstmtInsert.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean updateUsername(long userId, String username) {
+        String sql = "UPDATE users SET username = ? WHERE user_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            pstmt.setString(2, String.valueOf(userId));
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;

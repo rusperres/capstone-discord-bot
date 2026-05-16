@@ -8,6 +8,7 @@ import org.example.commands.GeneralCommands;
 import org.example.database.Classes.LeaderboardEntry;
 import org.example.database.Classes.User;
 import org.example.database.TicketRepository;
+import org.example.services.AuthService;
 import org.example.services.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,13 +29,15 @@ public class UserController implements HttpHandler {
     private final UserService userService;
     private final TicketRepository ticketRepository;
     private final GeneralCommands generalCommands;
+    private final AuthService authService;
 
-    public UserController(long guildId, JDA jda, UserService userService, TicketRepository ticketRepository, GeneralCommands generalCommands) {
+    public UserController(long guildId, JDA jda, UserService userService, TicketRepository ticketRepository, GeneralCommands generalCommands, AuthService authService) {
         this.guildId = guildId;
         this.jda = jda;
         this.userService = userService;
         this.ticketRepository = ticketRepository;
         this.generalCommands = generalCommands;
+        this.authService = authService;
     }
 
     @Override
@@ -43,6 +46,12 @@ public class UserController implements HttpHandler {
         String path = exchange.getRequestURI().getPath();
         String query = exchange.getRequestURI().getQuery();
         logger.info("Received {} request for {} with query {}", method, path, query);
+
+        AuthService.UserSession session = validateSession(exchange);
+        if (session == null) {
+            sendResponse(exchange, 401, "{\"error\":\"Unauthorized - Invalid or missing sessionId\"}");
+            return;
+        }
 
         try {
             if ("GET".equals(method) && "/api/profile".equals(path)) {
@@ -104,10 +113,18 @@ public class UserController implements HttpHandler {
         if (guild != null) {
             Member member = guild.getMemberById(userId);
             if (member != null) {
+                String[] resultMessage = new String[1];
                 generalCommands.performSetRole(guild, member, role, msg -> {
                     logger.info("REST API Role update for {}: {}", userId, msg);
+                    resultMessage[0] = msg;
                 });
-                sendResponse(exchange, 200, "{\"message\":\"User role updated successfully (Synced with Discord)\"}");
+                
+                // If the role was invalid or not found in Discord, it returns ❌
+                if (resultMessage[0] != null && resultMessage[0].startsWith("❌")) {
+                    sendResponse(exchange, 400, "{\"error\":\"" + resultMessage[0] + "\"}");
+                } else {
+                    sendResponse(exchange, 200, "{\"message\":\"" + resultMessage[0] + "\"}");
+                }
                 return;
             }
         }
@@ -160,6 +177,23 @@ public class UserController implements HttpHandler {
             return matcher.group(1);
         }
         return "";
+    }
+
+    private AuthService.UserSession validateSession(HttpExchange exchange) {
+        List<String> cookies = exchange.getRequestHeaders().get("Cookie");
+        if (cookies != null) {
+            for (String cookie : cookies) {
+                String[] parts = cookie.split(";");
+                for (String part : parts) {
+                    part = part.trim();
+                    if (part.startsWith("sessionId=")) {
+                        String sessionId = part.substring("sessionId=".length());
+                        return authService.getSession(sessionId);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {

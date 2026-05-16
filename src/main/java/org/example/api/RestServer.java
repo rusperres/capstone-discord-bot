@@ -45,9 +45,9 @@ public class RestServer {
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(port), 0);
         
-        TicketController ticketController = new TicketController(guildId, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands);
-        UserController userController = new UserController(guildId, jda, userService, ticketRepository, generalCommands);
-        AuthController authController = new AuthController(authService);
+        TicketController ticketController = new TicketController(guildId, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService);
+        UserController userController = new UserController(guildId, jda, userService, ticketRepository, generalCommands, authService);
+        AuthController authController = new AuthController(authService, userService);
 
         server.createContext("/api/tickets", ticketController);
         server.createContext("/api/profile", userController);
