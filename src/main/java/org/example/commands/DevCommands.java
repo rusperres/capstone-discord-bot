@@ -20,16 +20,19 @@ public class DevCommands {
 
         ThreadChannel thread = event.getChannel().asThreadChannel();
         Member member = event.getMember();
+        if (member == null) return;
 
+        performClaim(thread, member);
+        event.reply("🛠️ Ticket claimed by " + member.getAsMention()).queue();
+    }
+
+    public void performClaim(ThreadChannel thread, Member member) {
         String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
         String newName = "[CLAIMED][" + member.getEffectiveName() + "] " + cleanName;
-
         thread.getManager().setName(newName).queue();
 
         ticketService.updateThreadStatus(thread.getIdLong(), "CLAIMED");
         ticketService.assignDeveloper(thread.getIdLong(), member.getIdLong());
-
-        event.reply("🛠️ Ticket claimed by " + member.getAsMention()).queue();
     }
 
     public void handleUnclaim(SlashCommandInteractionEvent event) {
@@ -39,14 +42,17 @@ public class DevCommands {
         }
 
         ThreadChannel thread = event.getChannel().asThreadChannel();
+        performUnclaim(thread);
+        event.reply("🔓 Ticket unclaimed and reset to [OPEN].").queue();
+    }
+
+    public void performUnclaim(ThreadChannel thread) {
         String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
         String newName = "[OPEN] " + cleanName;
 
         thread.getManager().setName(newName).queue();
         ticketService.updateThreadStatus(thread.getIdLong(), "OPEN");
-        ticketService.assignDeveloper(thread.getIdLong(), 0L); // Clear assignment
-
-        event.reply("🔓 Ticket unclaimed and reset to [OPEN].").queue();
+        ticketService.assignDeveloper(thread.getIdLong(), 0L);
     }
 
     public void handleResolved(SlashCommandInteractionEvent event) {
@@ -58,19 +64,20 @@ public class DevCommands {
         String prUrl = event.getOption("pr_url").getAsString();
         ThreadChannel thread = event.getChannel().asThreadChannel();
         Member member = event.getMember();
+        if (member == null) return;
 
-        // 1. Rename to [PENDING-REVIEW]
+        performResolved(thread, member, prUrl);
+        event.reply("✅ Ticket resolved! PR: " + prUrl + "\nSubmitting for QA review...").queue();
+    }
+
+    public void performResolved(ThreadChannel thread, Member member, String prUrl) {
         String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
         String newName = "[PENDING-REVIEW] " + cleanName;
-
         thread.getManager().setName(newName).queue();
 
-        // 2. Database Update
         ticketService.updateThreadStatus(thread.getIdLong(), "PENDING-REVIEW");
         ticketService.setPrUrl(thread.getIdLong(), prUrl);
         ticketService.incrementDeveloperScore(member.getIdLong());
-
-        event.reply("✅ Ticket resolved! PR: " + prUrl + "\nSubmitting for QA review...").queue();
     }
 
     public void handleUnresolve(SlashCommandInteractionEvent event) {
@@ -81,15 +88,18 @@ public class DevCommands {
 
         ThreadChannel thread = event.getChannel().asThreadChannel();
         Member member = event.getMember();
+        if (member == null) return;
 
+        performUnresolve(thread, member);
+        event.reply("⚠️ Resolution reverted. Status reset to [CLAIMED].").queue();
+    }
+
+    public void performUnresolve(ThreadChannel thread, Member member) {
         String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
         String newName = "[CLAIMED][" + member.getEffectiveName() + "] " + cleanName;
-
         thread.getManager().setName(newName).queue();
 
         ticketService.updateThreadStatus(thread.getIdLong(), "CLAIMED");
         ticketService.decrementDeveloperScore(member.getIdLong());
-
-        event.reply("⚠️ Resolution reverted. Status reset to [CLAIMED].").queue();
     }
 }

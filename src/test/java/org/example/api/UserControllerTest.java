@@ -2,6 +2,8 @@ package org.example.api;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
+import net.dv8tion.jda.api.JDA;
+import org.example.commands.GeneralCommands;
 import org.example.database.Classes.LeaderboardEntry;
 import org.example.database.Classes.User;
 import org.example.database.TicketRepository;
@@ -30,6 +32,12 @@ public class UserControllerTest {
     private TicketRepository ticketRepository;
 
     @Mock
+    private JDA jda;
+
+    @Mock
+    private GeneralCommands generalCommands;
+
+    @Mock
     private HttpExchange exchange;
 
     private UserController userController;
@@ -37,7 +45,7 @@ public class UserControllerTest {
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        userController = new UserController(userService, ticketRepository);
+        userController = new UserController(123L, jda, userService, ticketRepository, generalCommands);
     }
 
     @Test

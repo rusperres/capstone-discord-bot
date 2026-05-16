@@ -1,6 +1,10 @@
 package org.example.api;
 
 import com.sun.net.httpserver.HttpServer;
+import net.dv8tion.jda.api.JDA;
+import org.example.commands.DevCommands;
+import org.example.commands.GeneralCommands;
+import org.example.commands.QACommands;
 import org.example.database.TicketRepository;
 import org.example.services.TicketService;
 import org.example.services.UserService;
@@ -13,23 +17,33 @@ import java.net.InetSocketAddress;
 public class RestServer {
     private static final Logger logger = LoggerFactory.getLogger(RestServer.class);
     private final int port;
+    private final long guildId;
+    private final JDA jda;
     private final TicketService ticketService;
     private final UserService userService;
     private final TicketRepository ticketRepository;
+    private final GeneralCommands generalCommands;
+    private final DevCommands devCommands;
+    private final QACommands qaCommands;
     private HttpServer server;
 
-    public RestServer(int port, TicketService ticketService, UserService userService, TicketRepository ticketRepository) {
+    public RestServer(int port, long guildId, JDA jda, TicketService ticketService, UserService userService, TicketRepository ticketRepository, GeneralCommands general, DevCommands dev, QACommands qa) {
         this.port = port;
+        this.guildId = guildId;
+        this.jda = jda;
         this.ticketService = ticketService;
         this.userService = userService;
         this.ticketRepository = ticketRepository;
+        this.generalCommands = general;
+        this.devCommands = dev;
+        this.qaCommands = qa;
     }
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(port), 0);
         
-        TicketController ticketController = new TicketController(ticketService, ticketRepository);
-        UserController userController = new UserController(userService, ticketRepository);
+        TicketController ticketController = new TicketController(guildId, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands);
+        UserController userController = new UserController(guildId, jda, userService, ticketRepository, generalCommands);
 
         server.createContext("/api/tickets", ticketController);
         server.createContext("/api/profile", userController);

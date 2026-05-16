@@ -2,6 +2,12 @@ package org.example.api;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import org.example.commands.DevCommands;
+import org.example.commands.GeneralCommands;
+import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
 import org.example.database.TicketRepository;
 import org.example.services.TicketService;
@@ -19,12 +25,20 @@ import java.util.regex.Pattern;
 
 public class TicketController implements HttpHandler {
     private static final Logger logger = LoggerFactory.getLogger(TicketController.class);
+    private final JDA jda;
     private final TicketService ticketService;
     private final TicketRepository ticketRepository;
+    private final DevCommands devCommands;
+    private final QACommands qaCommands;
+    private final GeneralCommands generalCommands;
 
-    public TicketController(TicketService ticketService, TicketRepository ticketRepository) {
+    public TicketController(long guildId, JDA jda, TicketService ticketService, TicketRepository ticketRepository, DevCommands devCommands, QACommands qaCommands, GeneralCommands generalCommands) {
+        this.jda = jda;
         this.ticketService = ticketService;
         this.ticketRepository = ticketRepository;
+        this.devCommands = devCommands;
+        this.qaCommands = qaCommands;
+        this.generalCommands = generalCommands;
     }
 
     @Override
@@ -87,9 +101,23 @@ public class TicketController implements HttpHandler {
             sendResponse(exchange, 400, "{\"error\":\"userId is required\"}");
             return;
         }
+
+        ThreadChannel thread = jda.getThreadChannelById(ticketId);
+        if (thread != null) {
+            Member member = thread.getGuild().getMemberById(userId);
+            if (member != null) {
+                devCommands.performClaim(thread, member);
+                logger.info("Ticket {} claimed by user {} via REST API", ticketId, userId);
+                sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
+                return;
+            }
+        }
+
+        // Fallback if Discord sync fails or is not applicable
         ticketService.assignDeveloper(ticketId, userId);
-        logger.info("Ticket {} claimed by user {}", ticketId, userId);
-        sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
+        ticketService.updateThreadStatus(ticketId, "CLAIMED");
+        logger.info("Ticket {} claimed by user {} (Fallback path)", ticketId, userId);
+        sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully (DB only)\"}");
     }
 
     private void handleResolveTicket(HttpExchange exchange, String path) throws IOException {
@@ -100,15 +128,53 @@ public class TicketController implements HttpHandler {
             sendResponse(exchange, 400, "{\"error\":\"prUrl is required\"}");
             return;
         }
+
+        ThreadChannel thread = jda.getThreadChannelById(ticketId);
+        if (thread != null) {
+            Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
+            if (ticket != null && ticket.getClaimedBy() != null) {
+                Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                if (member != null) {
+                    devCommands.performResolved(thread, member, prUrl);
+                    logger.info("Ticket {} resolved with PR {} via REST API", ticketId, prUrl);
+                    sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review\"}");
+                    return;
+                }
+            }
+        }
+
         ticketService.setPrUrl(ticketId, prUrl);
-        logger.info("Ticket {} resolved with PR: {}", ticketId, prUrl);
-        sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review\"}");
+        logger.info("Ticket {} resolved with PR {} (Fallback path)", ticketId, prUrl);
+        sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review (DB only)\"}");
     }
 
     private void handleUpdateStatus(HttpExchange exchange, String path, String status) throws IOException {
         long ticketId = extractId(path);
-        ticketService.updateThreadStatus(ticketId, status);
-        logger.info("Ticket {} status updated to {}", ticketId, status);
+        ThreadChannel thread = jda.getThreadChannelById(ticketId);
+        
+        if (thread != null) {
+            switch (status) {
+                case "CLOSED":
+                    generalCommands.performClosed(thread);
+                    break;
+                case "IN_REVIEW":
+                    Ticket ticket = ticketRepository.findTicketByThreadId(ticketId);
+                    if (ticket != null && ticket.getClaimedBy() != null) {
+                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                        if (member != null) {
+                            qaCommands.performUnreview(thread, member); // Moving to IN_REVIEW is essentially unreviewing if it was REVIEWED
+                        }
+                    }
+                    break;
+                case "OPEN":
+                    devCommands.performUnclaim(thread);
+                    break;
+            }
+        } else {
+            ticketService.updateThreadStatus(ticketId, status);
+        }
+
+        logger.info("Ticket {} status updated to {} via REST API", ticketId, status);
         sendResponse(exchange, 200, "{\"message\":\"Ticket status updated to " + status + "\"}");
     }
 

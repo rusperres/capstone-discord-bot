@@ -2,6 +2,10 @@ package org.example.api;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
+import net.dv8tion.jda.api.JDA;
+import org.example.commands.DevCommands;
+import org.example.commands.GeneralCommands;
+import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
 import org.example.database.TicketRepository;
 import org.example.services.TicketService;
@@ -29,6 +33,18 @@ public class TicketControllerTest {
     private TicketRepository ticketRepository;
 
     @Mock
+    private JDA jda;
+
+    @Mock
+    private DevCommands devCommands;
+
+    @Mock
+    private QACommands qaCommands;
+
+    @Mock
+    private GeneralCommands generalCommands;
+
+    @Mock
     private HttpExchange exchange;
 
     private TicketController ticketController;
@@ -36,7 +52,7 @@ public class TicketControllerTest {
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        ticketController = new TicketController(ticketService, ticketRepository);
+        ticketController = new TicketController(123L, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands);
     }
 
     @Test

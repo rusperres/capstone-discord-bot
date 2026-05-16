@@ -1,5 +1,6 @@
 package org.example.commands;
 
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import org.example.database.Classes.LeaderboardEntry;
 import org.example.services.TicketService;
 import org.example.services.UserService;
@@ -7,7 +8,6 @@ import org.example.services.UserService;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.UserSnowflake;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 
 import java.awt.*;
@@ -30,6 +30,10 @@ public class GeneralCommands {
 
         if(member==null)return;
 
+        performSetRole(event.getGuild(), member, roleInput, msg -> event.getHook().sendMessage(msg).queue());
+    }
+
+    public void performSetRole(net.dv8tion.jda.api.entities.Guild guild, Member member, String roleInput, java.util.function.Consumer<String> responseHandler) {
         // Configuration for roles: Shorthand -> {Discord Name, DB Name}
         java.util.Map<String, String[]> roleMap = new java.util.HashMap<>();
         roleMap.put("PM", new String[]{"Project Manager", "PROJECT_MANAGER"});
@@ -38,7 +42,7 @@ public class GeneralCommands {
 
         String[] roles = roleMap.get(roleInput);
         if (roles == null) {
-            event.getHook().sendMessage("❌ Invalid role selection.").queue();
+            if (responseHandler != null) responseHandler.accept("❌ Invalid role selection.");
             return;
         }
 
@@ -48,24 +52,24 @@ public class GeneralCommands {
         // Cleanup old roles
         List<String> managedDiscordRoles = Arrays.asList("PM", "Project Manager", "Developer", "QA");
         for(String r: managedDiscordRoles){
-            event.getGuild().getRolesByName(r, true).forEach(role -> {
+            guild.getRolesByName(r, true).forEach(role -> {
                 if (member.getRoles().contains(role)) {
-                    event.getGuild().removeRoleFromMember(member, role).queue();
+                    guild.removeRoleFromMember(member, role).queue();
                 }
             });
         }
 
         // Assign new role
-        Role newRole = event.getGuild().getRolesByName(discordRoleName, true).stream()
+        Role newRole = guild.getRolesByName(discordRoleName, true).stream()
                 .findFirst()
                 .orElse(null);
 
         if(newRole != null){
-            event.getGuild().addRoleToMember(member, newRole).queue();
+            guild.addRoleToMember(member, newRole).queue();
             userService.setUserRole(member.getIdLong(), dbRoleName);
-            event.getHook().sendMessage("✅ Role set to **" + discordRoleName + "** (Registered as " + dbRoleName + ")").queue();
+            if (responseHandler != null) responseHandler.accept("✅ Role set to **" + discordRoleName + "** (Registered as " + dbRoleName + ")");
         } else {
-            event.getHook().sendMessage("❌ Discord role **" + discordRoleName + "** not found in server. Please ensure the role exists.").queue();
+            if (responseHandler != null) responseHandler.accept("❌ Discord role **" + discordRoleName + "** not found in server. Please ensure the role exists.");
         }
     }
 
@@ -91,14 +95,18 @@ public class GeneralCommands {
             return;
         }
 
-        String threadName = event.getChannel().getName();
+        ThreadChannel thread = event.getChannel().asThreadChannel();
+        performClosed(thread);
+        event.reply("🔒 Ticket closed.").queue();
+    }
+
+    public void performClosed(ThreadChannel thread) {
+        String threadName = thread.getName();
         String cleanName = threadName.replaceAll("\\[.*?\\]", "").trim();
         String newName = "[CLOSED] " + cleanName;
 
-        event.getChannel().asThreadChannel().getManager().setName(newName).queue();
-        ticketService.updateThreadStatus(event.getChannel().getIdLong(), "CLOSED");
-
-        event.reply("🔒 Ticket closed.").queue();
+        thread.getManager().setName(newName).queue();
+        ticketService.updateThreadStatus(thread.getIdLong(), "CLOSED");
     }
 
     public void handleHelp(SlashCommandInteractionEvent event) {
