@@ -83,7 +83,7 @@ public class TicketController implements HttpHandler {
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/close")) {
                 handleUpdateStatus(exchange, path, "CLOSED");
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/review")) {
-                handleUpdateStatus(exchange, path, "IN_REVIEW");
+                handleUpdateStatus(exchange, path, "REVIEWED");
             } else if ("PATCH".equals(method) && path.matches("/api/tickets/[a-fA-F0-9\\-]+/demote")) {
                 handleUpdateStatus(exchange, path, "OPEN");
             } else {
@@ -105,6 +105,42 @@ public class TicketController implements HttpHandler {
         }
         json.append("]");
         sendResponse(exchange, 200, json.toString());
+    }
+
+    private void handleCreateTicket(HttpExchange exchange) throws IOException {
+        String body = readBody(exchange);
+        String title = extractStringFromJson(body, "title");
+        String content = extractStringFromJson(body, "description");
+        String priority = extractStringFromJson(body, "priority");
+        String status = extractStringFromJson(body, "status");
+
+        if (title.isEmpty()) {
+            sendResponse(exchange, 400, "{\"error\":\"title is required\"}");
+            return;
+        }
+
+        Ticket ticket = new Ticket(
+                java.util.UUID.randomUUID().toString(),
+                null, // No discord thread yet
+                title,
+                content,
+                status.isEmpty() ? "OPEN" : status,
+                null, // prUrl
+                null, // claimedBy
+                null, // closedBy
+                priority.isEmpty() ? "MEDIUM" : priority,
+                new ArrayList<>(), // categories
+                new java.text.SimpleDateFormat("MMMM d, yyyy", java.util.Locale.ENGLISH).format(new java.util.Date()),
+                null // dateClosed
+        );
+
+        boolean saved = ticketRepository.saveTicket(ticket);
+        if (saved) {
+            logger.info("Created new manual ticket: {}", ticket.getTicketId());
+            sendResponse(exchange, 201, ticket.toJson());
+        } else {
+            sendResponse(exchange, 500, "{\"error\":\"Failed to save ticket into database\"}");
+        }
     }
 
     private void handleGetTicket(HttpExchange exchange, String path) throws IOException {
@@ -323,11 +359,11 @@ public class TicketController implements HttpHandler {
                 case "CLOSED":
                     generalCommands.performClosed(thread);
                     break;
-                case "IN_REVIEW":
+                case "REVIEWED":
                     if (ticket != null && ticket.getClaimedBy() != null) {
                         Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
                         if (member != null) {
-                            qaCommands.performUnreview(thread, member);
+                            qaCommands.performReviewed(thread, member);
                         }
                     }
                     break;

@@ -5,7 +5,6 @@ import com.sun.net.httpserver.HttpHandler;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Member;
 import org.example.commands.GeneralCommands;
-import org.example.database.Classes.LeaderboardEntry;
 import org.example.database.Classes.User;
 import org.example.database.TicketRepository;
 import org.example.services.AuthService;
@@ -91,11 +90,16 @@ public class UserController implements HttpHandler {
         if (type == null || type.isEmpty()) {
             type = "dev"; // default
         }
-        List<LeaderboardEntry> leaderboard = userService.getLeaderboard(type);
+        List<User> leaderboard = userService.getLeaderboard(type);
         StringBuilder json = new StringBuilder("[");
         for (int i = 0; i < leaderboard.size(); i++) {
-            LeaderboardEntry entry = leaderboard.get(i);
-            json.append(String.format("{\"userId\":\"%d\",\"score\":%d}", entry.getUserId(), entry.getScore()));
+            User user = leaderboard.get(i);
+            int score = type.equalsIgnoreCase("dev") ? user.getDevScore() : user.getQaScore();
+            // Include both full user JSON and the specific 'score' field for compatibility
+            String userJson = user.toJson();
+            // Insert "score": value at the end of the JSON object
+            String augmentedJson = userJson.substring(0, userJson.length() - 1) + ",\"score\":" + score + "}";
+            json.append(augmentedJson);
             if (i < leaderboard.size() - 1) json.append(",");
         }
         json.append("]");

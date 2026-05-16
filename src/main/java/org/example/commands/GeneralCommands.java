@@ -1,7 +1,6 @@
 package org.example.commands;
 
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
-import org.example.database.Classes.LeaderboardEntry;
 import org.example.services.TicketService;
 import org.example.services.UserService;
 
@@ -77,15 +76,16 @@ public class GeneralCommands {
 
     public void handleLeaderboard(SlashCommandInteractionEvent event) {
         String type = event.getOption("type").getAsString();
-        List<org.example.database.Classes.LeaderboardEntry> stats = userService.getLeaderboard(type);
+        List<org.example.database.Classes.User> stats = userService.getLeaderboard(type);
 
         EmbedBuilder eb = new EmbedBuilder()
                 .setTitle("🏆 " + type.toUpperCase() + " Leaderboard")
                 .setColor(Color.YELLOW);
 
         for (int i = 0; i < stats.size(); i++) {
-            LeaderboardEntry entry = stats.get(i);
-            eb.appendDescription((i + 1) + ". <@" + entry.getUserId() + "> - " + entry.getScore() + " tickets\n");
+            org.example.database.Classes.User entry = stats.get(i);
+            int score = type.equalsIgnoreCase("dev") ? entry.getDevScore() : entry.getQaScore();
+            eb.appendDescription((i + 1) + ". <@" + entry.getUserId() + "> - " + score + " tickets\n");
         }
 
         event.replyEmbeds(eb.build()).queue();

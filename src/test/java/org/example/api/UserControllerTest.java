@@ -4,7 +4,6 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import net.dv8tion.jda.api.JDA;
 import org.example.commands.GeneralCommands;
-import org.example.database.Classes.LeaderboardEntry;
 import org.example.database.Classes.User;
 import org.example.database.TicketRepository;
 import org.example.services.AuthService;
@@ -79,8 +78,8 @@ public class UserControllerTest {
 
     @Test
     public void testHandleMembers() throws IOException {
-        LeaderboardEntry entry = new LeaderboardEntry(123L, 5);
-        List<LeaderboardEntry> leaderboard = Collections.singletonList(entry);
+        User user = new User("123", "JDoe", "Dev", 5, 2);
+        List<User> leaderboard = Collections.singletonList(user);
         when(userService.getLeaderboard("dev")).thenReturn(leaderboard);
         when(exchange.getRequestMethod()).thenReturn("GET");
         when(exchange.getRequestURI()).thenReturn(URI.create("/api/user/members?type=dev"));
