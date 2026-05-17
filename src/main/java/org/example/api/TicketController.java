@@ -394,6 +394,7 @@ public class TicketController implements HttpHandler {
                     break;
                 case "REVIEWED":
                     Member reviewMember = thread.getGuild().getMemberById(session.userId);
+                    if(reviewMember == null) reviewMember = thread.getGuild().retrieveMemberById(session.userId).complete();
                     if (reviewMember != null) {
                         qaCommands.performReviewed(thread, reviewMember);
                     }
@@ -404,6 +405,7 @@ public class TicketController implements HttpHandler {
                 case "UNRESOLVE":
                     if (ticket != null && ticket.getClaimedBy() != null) {
                         Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
+                        if(member == null) member = thread.getGuild().retrieveMemberById(ticket.getClaimedBy()).complete();
                         if (member != null) {
                             devCommands.performUnresolve(thread, member);
                         }
@@ -411,6 +413,7 @@ public class TicketController implements HttpHandler {
                     break;
                 case "UNREVIEW":
                     Member unreviewMember = thread.getGuild().getMemberById(session.userId);
+                    if(unreviewMember == null) unreviewMember = thread.getGuild().retrieveMemberById(session.userId).complete();
                     if (unreviewMember != null) {
                         qaCommands.performUnreview(thread, unreviewMember);
                     }

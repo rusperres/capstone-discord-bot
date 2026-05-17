@@ -6,7 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="cda8f8ec-79e0-48c5-b65e-a609c8917155" name="Changes" comment="ticket fiix">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/database/DatabaseManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/database/DatabaseManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/Main.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/api/TicketController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/api/TicketController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/example/database/TicketRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/database/TicketRepository.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -17,7 +18,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="samson/ticket-fix" />
+        <entry key="$PROJECT_DIR$" value="experiment/jairus/cors" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -43,7 +44,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "samson/enhancement/testing",
+    "git-widget-placeholder": "experiment/samson",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/home/jusme/Documents/SchoolWork/capstone-discord-bot/tickets",
     "nodejs_package_manager_path": "npm",
@@ -104,5 +105,16 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="ticket fiix" />
     <option name="LAST_COMMIT_MESSAGE" value="ticket fiix" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/org/example/api/TicketController.java</url>
+          <line>384</line>
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
