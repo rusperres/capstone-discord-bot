@@ -17,6 +17,8 @@ public class TicketRepository {
     /* ---------------------------------------------- USER METHODS -------------------------------------------*/
 
     public boolean upsertUser(long userId, String role) {
+        if (role == null) role = "QA"; // Default
+        role = role.toUpperCase().replace(" ", "_");
         String stringId = String.valueOf(userId);
 
         // Ensure the user exists in the main users table first
