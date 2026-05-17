@@ -30,6 +30,11 @@ public class AuthController implements HttpHandler {
         String path = exchange.getRequestURI().getPath();
         String query = exchange.getRequestURI().getQuery();
         logger.info("Received {} request for {} with query {}", method, path, query);
+        
+        if ("OPTIONS".equals(method)) {
+            handleOptions(exchange);
+            return;
+        }
 
         try {
             if ("GET".equals(method) && "/api/auth/login".equals(path)) {
@@ -47,13 +52,30 @@ public class AuthController implements HttpHandler {
         }
     }
 
+    private void handleOptions(HttpExchange exchange) throws IOException {
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Cookie");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
+        exchange.sendResponseHeaders(204, -1);
+        exchange.close();
+    }
+
     private void handleLogin(HttpExchange exchange, String query) throws IOException {
         String userId = extractParam(query, "id");
         // User ID is now optional; if null, the callback will identify the user.
         
         String sessionId = UUID.randomUUID().toString();
         String state = authService.generateState(sessionId, userId != null ? userId : "pending");
-        String redirectUrl = authService.getOAuthUrl(state);
+        
+        String host = exchange.getRequestHeaders().getFirst("Host");
+        String redirectUri = null;
+        if (host != null) {
+            redirectUri = "http://" + host + "/api/auth/callback";
+            logger.info("Constructed dynamic redirect URI: {}", redirectUri);
+        }
+
+        String redirectUrl = authService.getOAuthUrl(state, redirectUri);
 
         // Return JSON instead of 302 to allow the Client to get the sessionId
         String response = String.format("{\"url\":\"%s\",\"sessionId\":\"%s\"}", redirectUrl, sessionId);
@@ -98,8 +120,15 @@ public class AuthController implements HttpHandler {
         String sessionId = parts[0];
         String userId = parts[1];
 
+
         try {
-            String accessToken = authService.exchangeCodeForToken(code);
+            String host = exchange.getRequestHeaders().getFirst("Host");
+            String redirectUri = null;
+            if (host != null) {
+                redirectUri = "http://" + host + "/api/auth/callback";
+            }
+
+            String accessToken = authService.exchangeCodeForToken(code, redirectUri);
             if (accessToken == null) {
                 sendResponse(exchange, 401, "{\"error\":\"Failed to exchange code for token\"}");
                 return;
@@ -152,6 +181,10 @@ public class AuthController implements HttpHandler {
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Cookie");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
         exchange.sendResponseHeaders(statusCode, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);

@@ -60,21 +60,23 @@ public class AuthService {
         return null;
     }
 
-    public String getOAuthUrl(String state) {
+    public String getOAuthUrl(String state, String redirectUri) {
+        String uri = (redirectUri != null) ? redirectUri : config.getDiscordRedirectUri();
         return "https://discord.com/api/oauth2/authorize" +
                 "?client_id=" + config.getDiscordClientId() +
-                "&redirect_uri=" + URLEncoder.encode(config.getDiscordRedirectUri(), StandardCharsets.UTF_8) +
+                "&redirect_uri=" + URLEncoder.encode(uri, StandardCharsets.UTF_8) +
                 "&response_type=code" +
                 "&scope=identify" +
                 "&state=" + state;
     }
 
-    public String exchangeCodeForToken(String code) throws IOException, InterruptedException {
+    public String exchangeCodeForToken(String code, String redirectUri) throws IOException, InterruptedException {
+        String uri = (redirectUri != null) ? redirectUri : config.getDiscordRedirectUri();
         String form = "client_id=" + config.getDiscordClientId() +
                 "&client_secret=" + config.getDiscordClientSecret() +
                 "&grant_type=authorization_code" +
                 "&code=" + code +
-                "&redirect_uri=" + URLEncoder.encode(config.getDiscordRedirectUri(), StandardCharsets.UTF_8);
+                "&redirect_uri=" + URLEncoder.encode(uri, StandardCharsets.UTF_8);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://discord.com/api/oauth2/token"))
