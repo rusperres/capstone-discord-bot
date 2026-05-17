@@ -46,6 +46,11 @@ public class UserController implements HttpHandler {
         String query = exchange.getRequestURI().getQuery();
         logger.info("Received {} request for {} with query {}", method, path, query);
 
+        if ("OPTIONS".equals(method)) {
+            handleOptions(exchange);
+            return;
+        }
+
         AuthService.UserSession session = validateSession(exchange);
         if (session == null) {
             sendResponse(exchange, 401, "{\"error\":\"Unauthorized - Invalid or missing sessionId\"}");
@@ -69,6 +74,15 @@ public class UserController implements HttpHandler {
             logger.error("Error handling request for {} {}", method, path, e);
             sendResponse(exchange, 500, "{\"error\":\"Internal Server Error\"}");
         }
+    }
+
+    private void handleOptions(HttpExchange exchange) throws IOException {
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Cookie");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
+        exchange.sendResponseHeaders(204, -1);
+        exchange.close();
     }
 
     private void handleProfile(HttpExchange exchange, String query) throws IOException {
@@ -217,6 +231,10 @@ public class UserController implements HttpHandler {
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Cookie");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
         exchange.sendResponseHeaders(statusCode, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);

@@ -271,8 +271,6 @@ public class TicketRepository {
             pstmt.setString(7, ticket.getDate_added());
             pstmt.setString(8, ticket.getDate_closed());
             pstmt.setString(9, ticket.getPrUrl());
-            pstmt.setString(10, ticket.getClaimedBy() != null && !ticket.getClaimedBy().trim().isEmpty() ? ticket.getClaimedBy() : null);
-            pstmt.setString(11, ticket.getClosedBy() != null && !ticket.getClosedBy().trim().isEmpty() ? ticket.getClosedBy() : null);
 
             // 1. Save the main ticket row
             boolean isSaved = pstmt.executeUpdate() > 0;

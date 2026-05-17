@@ -4,6 +4,8 @@ package org.example;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.ChunkingFilter;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
 import org.example.commands.*;
 import org.example.database.DatabaseManager;
 import org.example.database.TicketRepository;
@@ -51,8 +53,11 @@ public class Main
             JDA jda = JDABuilder.createDefault(config.getDiscordToken())
                     .enableIntents(GatewayIntent.GUILD_MESSAGES,
                             GatewayIntent.MESSAGE_CONTENT,
-                            GatewayIntent.GUILD_MEMBERS)
+                            GatewayIntent.GUILD_MEMBERS
+                    )
                     .addEventListeners(commandManager)
+                    .setMemberCachePolicy(MemberCachePolicy.ALL)
+                    .setChunkingFilter(ChunkingFilter.ALL)
                     .build();
 
             jda.awaitReady();
