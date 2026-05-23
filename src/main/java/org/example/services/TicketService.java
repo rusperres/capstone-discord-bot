@@ -73,21 +73,14 @@ public class TicketService {
 
 // for rebuild
     public void addThread(long threadId, String title, String status) {
-        Ticket ticket = new Ticket(
-                UUID.randomUUID().toString(), // Temporary ID generation
-                String.valueOf(threadId),
-                title,
-                "", // No description initially
-                status,
-                null,
-                null,
-                null,
-
-                "LOW",
-                null,
-                null,
-                null
-        );
+        Ticket ticket = new Ticket.TicketBuilder()
+                .setTicketId(UUID.randomUUID().toString())
+                .setDiscordThreadId(String.valueOf(threadId))
+                .setTitle(title)
+                .setDescription("")
+                .setStatus(status)
+                .setPriority("LOW")
+                .build();
         ticketRepository.saveTicket(ticket);
     }
 // for actual load

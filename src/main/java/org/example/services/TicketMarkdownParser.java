@@ -38,20 +38,19 @@ public class TicketMarkdownParser {
         // optional: extract first heading or full body as description
         String description = extractDescription(body);
 
-        return new Ticket(
-                UUID.randomUUID().toString(),   // or derive from filename
-                null,                            // discordThreadId (filled later)
-                title,
-                description,
-                status,
-                prUrl,
-                claimedBy,
-                closedBy,
-                priority,
-                categories,
-                dateAdded,
-                dateClosed
-        );
+        return new Ticket.TicketBuilder()
+                .setTicketId(UUID.randomUUID().toString())
+                .setTitle(title)
+                .setDescription(description)
+                .setStatus(status)
+                .setPrUrl(prUrl)
+                .setClaimedBy(claimedBy)
+                .setClosedBy(closedBy)
+                .setPriority(priority)
+                .setCategories(categories)
+                .setDateAdded(dateAdded)
+                .setDateClosed(dateClosed)
+                .build();
     }
 
     private Map<String, String> parseMeta(String metaBlock) {

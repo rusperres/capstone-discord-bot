@@ -7,15 +7,11 @@ import org.example.database.Classes.Ticket;
 import org.example.services.TicketLoader;
 import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class AdminCommands {
     private final TicketService ticketService;

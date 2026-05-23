@@ -11,7 +11,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -71,16 +70,15 @@ public class TicketRepositoryTest {
 
     @Test
     void testSaveTicket_Success() {
-        Ticket ticket = new Ticket(
-                UUID.randomUUID().toString(),
-                "123456",
-                "Fix Bug",
-                "Description",
-                "OPEN",
-                null, null, null, "HIGH",
-                Collections.emptyList(),
-                null, null
-        );
+        Ticket ticket = new Ticket.TicketBuilder()
+                .setTicketId(UUID.randomUUID().toString())
+                .setDiscordThreadId("123456")
+                .setTitle("Fix Bug")
+                .setDescription("Description")
+                .setStatus("OPEN")
+                .setPriority("HIGH")
+                .setCategories(Collections.emptyList())
+                .build();
 
         assertTrue(repository.saveTicket(ticket));
         
@@ -110,12 +108,16 @@ public class TicketRepositoryTest {
         long userId = 111L;
         repository.upsertUser(userId, "DEVELOPER");
 
-        Ticket ticket = new Ticket(
-                "T-01", "111", "User Ticket", "Desc", "CLAIMED",
-                null, String.valueOf(userId), null, "LOW",
-                Collections.emptyList(),
-                null, null
-        );
+        Ticket ticket = new Ticket.TicketBuilder()
+                .setTicketId("T-01")
+                .setDiscordThreadId("111")
+                .setTitle("User Ticket")
+                .setDescription("Desc")
+                .setStatus("CLAIMED")
+                .setClaimedBy(String.valueOf(userId))
+                .setPriority("LOW")
+                .setCategories(Collections.emptyList())
+                .build();
         repository.saveTicket(ticket);
 
         // Verify claimed_by is set
@@ -134,13 +136,15 @@ public class TicketRepositoryTest {
 
     @Test
     void testCheckConstraintViolationNormalizedToOpen() {
-        Ticket ticket = new Ticket(
-                "T-BAD", "222", "Bad Status", "Desc",
-                "INVALID_STATUS", // Normalized to OPEN by Ticket.validateStatus()
-                null, null, null, "LOW",
-                Collections.emptyList(),
-                null, null
-        );
+        Ticket ticket = new Ticket.TicketBuilder()
+                .setTicketId("T-BAD")
+                .setDiscordThreadId("222")
+                .setTitle("Bad Status")
+                .setDescription("Desc")
+                .setStatus("INVALID_STATUS")
+                .setPriority("LOW")
+                .setCategories(Collections.emptyList())
+                .build();
 
         // Verification: Domain model should normalize invalid status to OPEN
         assertEquals("OPEN", ticket.getStatus());

@@ -2,13 +2,9 @@ package org.example.api;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.Member;
-import org.example.commands.GeneralCommands;
 import org.example.database.Classes.User;
-import org.example.database.TicketRepository;
 import org.example.services.AuthService;
-import org.example.services.UserService;
+import org.example.services.BackendFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,20 +19,10 @@ import java.util.regex.Pattern;
 
 public class UserController implements HttpHandler {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
-    private final long guildId;
-    private final JDA jda;
-    private final UserService userService;
-    private final TicketRepository ticketRepository;
-    private final GeneralCommands generalCommands;
-    private final AuthService authService;
+    private final BackendFacade facade;
 
-    public UserController(long guildId, JDA jda, UserService userService, TicketRepository ticketRepository, GeneralCommands generalCommands, AuthService authService) {
-        this.guildId = guildId;
-        this.jda = jda;
-        this.userService = userService;
-        this.ticketRepository = ticketRepository;
-        this.generalCommands = generalCommands;
-        this.authService = authService;
+    public UserController(BackendFacade facade) {
+        this.facade = facade;
     }
 
     @Override
@@ -91,7 +77,7 @@ public class UserController implements HttpHandler {
             sendResponse(exchange, 400, "{\"error\":\"id parameter is required\"}");
             return;
         }
-        User user = ticketRepository.getUser(userId);
+        User user = facade.getUser(userId);
         if (user != null) {
             sendResponse(exchange, 200, user.toJson());
         } else {
@@ -104,7 +90,7 @@ public class UserController implements HttpHandler {
         if (type == null || type.isEmpty()) {
             type = "dev"; // default
         }
-        List<User> leaderboard = userService.getLeaderboard(type);
+        List<User> leaderboard = facade.getLeaderboard(type);
         StringBuilder json = new StringBuilder("[");
         for (int i = 0; i < leaderboard.size(); i++) {
             User user = leaderboard.get(i);
@@ -129,34 +115,14 @@ public class UserController implements HttpHandler {
             return;
         }
 
-        net.dv8tion.jda.api.entities.Guild guild = jda.getGuildById(guildId);
-        if (guild != null) {
-            Member member = guild.getMemberById(userId);
-            if (member != null) {
-                String[] resultMessage = new String[1];
-                generalCommands.performSetRole(guild, member, role, msg -> {
-                    logger.info("REST API Role update for {}: {}", userId, msg);
-                    resultMessage[0] = msg;
-                });
-                
-                // If the role was invalid or not found in Discord, it returns ❌
-                if (resultMessage[0] != null && resultMessage[0].startsWith("❌")) {
-                    sendResponse(exchange, 400, "{\"error\":\"" + resultMessage[0] + "\"}");
-                } else {
-                    sendResponse(exchange, 200, "{\"message\":\"" + resultMessage[0] + "\"}");
-                }
-                return;
-            }
-        }
-
-        userService.setUserRole(userId, role);
-        logger.info("Updated role for user {} to {} (DB only)", userId, role);
-        sendResponse(exchange, 200, "{\"message\":\"User role updated successfully (DB only)\"}");
+        facade.setUserRole(userId, role);
+        logger.info("Updated role for user {} to {} (REST API)", userId, role);
+        sendResponse(exchange, 200, "{\"message\":\"User role updated successfully\"}");
     }
 
     private void handleDeleteUser(HttpExchange exchange, String path) throws IOException {
         long userId = extractId(path);
-        boolean deleted = ticketRepository.deleteUser(userId);
+        boolean deleted = facade.repository().deleteUser(userId);
         if (deleted) {
             logger.info("Deleted user {} via REST API", userId);
             sendResponse(exchange, 200, "{\"message\":\"User deleted successfully\"}");
@@ -220,7 +186,7 @@ public class UserController implements HttpHandler {
                     part = part.trim();
                     if (part.startsWith("sessionId=")) {
                         String sessionId = part.substring("sessionId=".length());
-                        return authService.getSession(sessionId);
+                        return facade.getSession(sessionId);
                     }
                 }
             }

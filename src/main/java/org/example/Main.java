@@ -14,6 +14,7 @@ import org.example.services.TicketMarkdownParser;
 import org.example.services.TicketService;
 import org.example.services.UserService;
 import org.example.services.AuthService;
+import org.example.services.BackendFacade;
 import org.example.api.RestServer;
 
 
@@ -63,12 +64,25 @@ public class Main
             jda.awaitReady();
             commandManager.registerCommands(jda, config.getGuildId());
 
+            BackendFacade facade = new BackendFacade(
+                    ticketService,
+                    userService,
+                    authService,
+                    repository,
+                    loader,
+                    ticketMarkdownParser,
+                    jda,
+                    config.getGuildId()
+            );
+
+            commandManager.registerFacadeCommands(facade);
+
             System.out.println("🚀 Bot is online! Connected to " + jda.getGuilds().size() + " guild(s).");
             System.out.println("📌 Configured Guild ID: " + config.getGuildId());
 
             // Start REST Server
             int port = 8080; 
-            RestServer restServer = new RestServer(port, config.getGuildId(), jda, ticketService, userService, repository, general, dev, qa, authService, loader, ticketMarkdownParser);
+            RestServer restServer = new RestServer(port, facade);
             restServer.start();
             System.out.println("🌐 REST API is listening on port " + port);
 
