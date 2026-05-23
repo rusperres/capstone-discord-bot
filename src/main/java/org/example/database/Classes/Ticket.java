@@ -21,30 +21,53 @@ public class Ticket {
     private String date_added; // new update
 
 
-    public Ticket(String ticketId, String discordThreadId,
-                  String title, String description, String status,
-                  String prUrl, String claimedBy, String closedBy,
-                  String priority, List<String> categories,
-                  String date_added, String date_closed) {
-        this.ticketId = ticketId;
-        this.title = title;
-        this.description = description;
-        this.priority = priority;
-        this.categories = categories;
-
-        this.discordThreadId = discordThreadId;
-        this.prUrl = prUrl;
-
-
-        this.status = status;
-
-        this.claimedBy = claimedBy;
-
-        this.closedBy = closedBy;
-        this.date_closed = date_closed;
-        this.date_added = date_added;
+    private Ticket(TicketBuilder builder) {
+        this.ticketId = builder.ticketId;
+        this.title = builder.title;
+        this.description = builder.description;
+        this.status = builder.status;
+        this.priority = builder.priority;
+        this.categories = builder.categories;
+        this.discordThreadId = builder.discordThreadId;
+        this.prUrl = builder.prUrl;
+        this.claimedBy = builder.claimedBy;
+        this.closedBy = builder.closedBy;
+        this.date_added = builder.dateAdded;
+        this.date_closed = builder.dateClosed;
 
         validateStatus();
+    }
+
+    public static class TicketBuilder {
+        private String ticketId;
+        private String title;
+        private String description;
+        private String status;
+        private String priority;
+        private List<String> categories;
+        private String discordThreadId;
+        private String prUrl;
+        private String claimedBy;
+        private String closedBy;
+        private String dateAdded;
+        private String dateClosed;
+
+        public TicketBuilder setTicketId(String ticketId) { this.ticketId = ticketId; return this; }
+        public TicketBuilder setTitle(String title) { this.title = title; return this; }
+        public TicketBuilder setDescription(String description) { this.description = description; return this; }
+        public TicketBuilder setStatus(String status) { this.status = status; return this; }
+        public TicketBuilder setPriority(String priority) { this.priority = priority; return this; }
+        public TicketBuilder setCategories(List<String> categories) { this.categories = categories; return this; }
+        public TicketBuilder setDiscordThreadId(String discordThreadId) { this.discordThreadId = discordThreadId; return this; }
+        public TicketBuilder setPrUrl(String prUrl) { this.prUrl = prUrl; return this; }
+        public TicketBuilder setClaimedBy(String claimedBy) { this.claimedBy = claimedBy; return this; }
+        public TicketBuilder setClosedBy(String closedBy) { this.closedBy = closedBy; return this; }
+        public TicketBuilder setDateAdded(String dateAdded) { this.dateAdded = dateAdded; return this; }
+        public TicketBuilder setDateClosed(String dateClosed) { this.dateClosed = dateClosed; return this; }
+
+        public Ticket build() {
+            return new Ticket(this);
+        }
     }
 
     private void validateStatus(){

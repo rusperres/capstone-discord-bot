@@ -2,12 +2,9 @@ package org.example.api;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
-import net.dv8tion.jda.api.JDA;
-import org.example.commands.GeneralCommands;
 import org.example.database.Classes.User;
-import org.example.database.TicketRepository;
 import org.example.services.AuthService;
-import org.example.services.UserService;
+import org.example.services.BackendFacade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -26,42 +23,30 @@ import static org.mockito.Mockito.*;
 public class UserControllerTest {
 
     @Mock
-    private UserService userService;
-
-    @Mock
-    private TicketRepository ticketRepository;
-
-    @Mock
-    private JDA jda;
-
-    @Mock
-    private GeneralCommands generalCommands;
+    private BackendFacade facade;
 
     @Mock
     private HttpExchange exchange;
-
-    @Mock
-    private AuthService authService;
 
     private UserController userController;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        userController = new UserController(123L, jda, userService, ticketRepository, generalCommands, authService);
+        userController = new UserController(facade);
 
         // Mock a valid session for all tests
         Headers requestHeaders = new Headers();
         requestHeaders.add("Cookie", "sessionId=valid_session");
         when(exchange.getRequestHeaders()).thenReturn(requestHeaders);
         AuthService.UserSession mockSession = new AuthService.UserSession("123", "did", "username", "av", "token");
-        when(authService.getSession("valid_session")).thenReturn(mockSession);
+        when(facade.getSession("valid_session")).thenReturn(mockSession);
     }
 
     @Test
     public void testHandleProfile() throws IOException {
         User user = new User("123", "JDoe", "Dev", 5, 2);
-        when(ticketRepository.getUser(123L)).thenReturn(user);
+        when(facade.getUser(123L)).thenReturn(user);
         when(exchange.getRequestMethod()).thenReturn("GET");
         when(exchange.getRequestURI()).thenReturn(URI.create("/api/profile?id=123"));
         
@@ -80,7 +65,7 @@ public class UserControllerTest {
     public void testHandleMembers() throws IOException {
         User user = new User("123", "JDoe", "Dev", 5, 2);
         List<User> leaderboard = Collections.singletonList(user);
-        when(userService.getLeaderboard("dev")).thenReturn(leaderboard);
+        when(facade.getLeaderboard("dev")).thenReturn(leaderboard);
         when(exchange.getRequestMethod()).thenReturn("GET");
         when(exchange.getRequestURI()).thenReturn(URI.create("/api/user/members?type=dev"));
         
@@ -108,7 +93,7 @@ public class UserControllerTest {
 
         userController.handle(exchange);
 
-        verify(userService).setUserRole(123L, "QA");
+        verify(facade).setUserRole(123L, "QA");
         verify(exchange).sendResponseHeaders(eq(200), anyLong());
     }
 }

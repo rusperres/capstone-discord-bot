@@ -2,19 +2,12 @@ package org.example.api;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
-import org.example.commands.DevCommands;
-import org.example.commands.GeneralCommands;
-import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
-import org.example.database.TicketRepository;
 import org.example.services.AuthService;
-import org.example.services.TicketLoader;
-import org.example.services.TicketMarkdownParser;
-import org.example.services.TicketService;
+import org.example.services.BackendFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,26 +24,10 @@ import java.util.regex.Pattern;
 
 public class TicketController implements HttpHandler {
     private static final Logger logger = LoggerFactory.getLogger(TicketController.class);
-    private final JDA jda;
-    private final TicketService ticketService;
-    private final TicketRepository ticketRepository;
-    private final DevCommands devCommands;
-    private final QACommands qaCommands;
-    private final GeneralCommands generalCommands;
-    private final AuthService authService;
-    private final TicketLoader ticketLoader;
-    private final TicketMarkdownParser ticketMarkdownParser;
+    private final BackendFacade facade;
 
-    public TicketController(long guildId, JDA jda, TicketService ticketService, TicketRepository ticketRepository, DevCommands devCommands, QACommands qaCommands, GeneralCommands generalCommands, AuthService authService, TicketLoader ticketLoader, TicketMarkdownParser ticketMarkdownParser) {
-        this.jda = jda;
-        this.ticketService = ticketService;
-        this.ticketRepository = ticketRepository;
-        this.devCommands = devCommands;
-        this.qaCommands = qaCommands;
-        this.generalCommands = generalCommands;
-        this.authService = authService;
-        this.ticketLoader = ticketLoader;
-        this.ticketMarkdownParser = ticketMarkdownParser;
+    public TicketController(BackendFacade facade) {
+        this.facade = facade;
     }
 
     @Override
@@ -119,7 +96,7 @@ public class TicketController implements HttpHandler {
     }
 
     private void handleListTickets(HttpExchange exchange) throws IOException {
-        List<Ticket> tickets = ticketRepository.getAllActiveTickets();
+        List<Ticket> tickets = facade.getAllActiveTickets();
         StringBuilder json = new StringBuilder("[");
         for (int i = 0; i < tickets.size(); i++) {
             json.append(tickets.get(i).toJson());
@@ -141,22 +118,17 @@ public class TicketController implements HttpHandler {
             return;
         }
 
-        Ticket ticket = new Ticket(
-                java.util.UUID.randomUUID().toString(),
-                null, // No discord thread yet
-                title,
-                content,
-                status.isEmpty() ? "OPEN" : status,
-                null, // prUrl
-                null, // claimedBy
-                null, // closedBy
-                priority.isEmpty() ? "MEDIUM" : priority,
-                new ArrayList<>(), // categories
-                new java.text.SimpleDateFormat("MMMM d, yyyy", java.util.Locale.ENGLISH).format(new java.util.Date()),
-                null // dateClosed
-        );
+        Ticket ticket = new Ticket.TicketBuilder()
+                .setTicketId(java.util.UUID.randomUUID().toString())
+                .setTitle(title)
+                .setDescription(content)
+                .setStatus(status.isEmpty() ? "OPEN" : status)
+                .setPriority(priority.isEmpty() ? "MEDIUM" : priority)
+                .setCategories(new ArrayList<>())
+                .setDateAdded(new java.text.SimpleDateFormat("MMMM d, yyyy", java.util.Locale.ENGLISH).format(new java.util.Date()))
+                .build();
 
-        boolean saved = ticketRepository.saveTicket(ticket);
+        boolean saved = facade.saveTicket(ticket);
         if (saved) {
             logger.info("Created new manual ticket: {}", ticket.getTicketId());
             sendResponse(exchange, 201, ticket.toJson());
@@ -169,9 +141,9 @@ public class TicketController implements HttpHandler {
         String rawId = extractRawId(path);
         Ticket ticket;
         if (isNumeric(rawId)) {
-            ticket = ticketRepository.findTicketByThreadId(Long.parseLong(rawId));
+            ticket = facade.getTicketByThreadId(Long.parseLong(rawId));
         } else {
-            ticket = ticketRepository.findTicketByTicketId(rawId);
+            ticket = facade.getTicketByTicketId(rawId);
         }
         if (ticket != null) {
             sendResponse(exchange, 200, ticket.toJson());
@@ -190,35 +162,35 @@ public class TicketController implements HttpHandler {
             return;
         }
 
-        net.dv8tion.jda.api.entities.channel.concrete.TextChannel channel = jda.getTextChannelById(channelId);
+        net.dv8tion.jda.api.entities.channel.concrete.TextChannel channel = facade.jda().getTextChannelById(channelId);
         if (channel == null) {
             sendResponse(exchange, 400, "{\"error\":\"Invalid channelId\"}");
             return;
         }
 
         try {
-            List<Path> files = ticketLoader.getMarkdownFiles(folderName);
+            List<Path> files = facade.loader().getMarkdownFiles(folderName);
             int loadedCount = 0;
             int enrichedCount = 0;
 
             for (Path file : files) {
                 String fileName = file.getFileName().toString();
 
-                Ticket ticket = ticketMarkdownParser.parse(file);
+                Ticket ticket = facade.parser().parse(file);
                 String title = ticket.getTitle();
                 String content = ticket.getDescription();
 
                 // Check if a ticket with this title already exists (e.g. from a prior rebuild)
-                Ticket existing = ticketService.findTicketByTitle(title);
+                Ticket existing = facade.repository().findTicketByTitle(title);
                 if (existing != null) {
                     // Enrich the existing record with description (don't create a new thread)
-                    ticketService.updateTicketDescription(existing.getTicketId(), content, existing.getDiscordThreadId());
-                    ticketService.markTicketLoaded(fileName);
+                    facade.repository().updateTicketDescription(existing.getTicketId(), content, existing.getDiscordThreadId());
+                    facade.repository().markTicketLoaded(fileName);
                     enrichedCount++;
                     continue;
                 }
 
-                if (ticketService.isTicketLoaded(fileName)) continue;
+                if (facade.repository().isFileNameLoaded(fileName)) continue;
 
                 // No existing record — create a new Discord thread
                 channel.createThreadChannel("[OPEN] " + title)
@@ -229,8 +201,8 @@ public class TicketController implements HttpHandler {
                                 thread.sendMessage(section).queue();
                             }
                             ticket.setDiscordThreadId(String.valueOf(thread.getIdLong()));
-                            ticketService.addThread(ticket);
-                            ticketService.markTicketLoaded(fileName);
+                            facade.saveTicket(ticket);
+                            facade.repository().markTicketLoaded(fileName);
                         });
                 loadedCount++;
             }
@@ -265,7 +237,7 @@ public class TicketController implements HttpHandler {
             return;
         }
 
-        TextChannel channel = jda.getTextChannelById(channelId);
+        TextChannel channel = facade.jda().getTextChannelById(channelId);
         if (channel == null) {
             sendResponse(exchange, 400, "{\"error\":\"Invalid channelId\"}");
             return;
@@ -274,15 +246,14 @@ public class TicketController implements HttpHandler {
         List<ThreadChannel> threads = channel.getThreadChannels();
 
         // Clear all existing ticket data for a clean rebuild
-        ticketService.deleteAllTickets();
+        facade.repository().deleteAllTickets();
         logger.info("Cleared all existing ticket data for rebuild");
 
         // Deduplicate: keep only the latest thread per unique title
-        // (thread list from JDA is ordered oldest-first, so later entries overwrite earlier ones)
         java.util.Map<String, ThreadChannel> latestByTitle = new java.util.LinkedHashMap<>();
         for (ThreadChannel thread : threads) {
             String cleanName = thread.getName().replaceAll("\\[.*?\\]", "").trim();
-            latestByTitle.put(cleanName.toLowerCase(), thread); // overwrite older duplicates
+            latestByTitle.put(cleanName.toLowerCase(), thread);
         }
 
         int rebuilt = 0;
@@ -296,7 +267,7 @@ public class TicketController implements HttpHandler {
             else if (name.contains("[CLOSED]")) status = "CLOSED";
 
             String cleanName = name.replaceAll("\\[.*?\\]", "").trim();
-            ticketService.addThread(thread.getIdLong(), cleanName, status);
+            facade.ticketService().addThread(thread.getIdLong(), cleanName, status);
             rebuilt++;
         }
 
@@ -319,7 +290,8 @@ public class TicketController implements HttpHandler {
         if (thread != null) {
             Member member = thread.getGuild().getMemberById(userId);
             if (member != null) {
-                devCommands.performClaim(thread, member);
+                // Command pattern refactor will consolidate these soon
+                facade.assignDeveloper(thread.getIdLong(), userId);
                 logger.info("Ticket {} claimed by user {} via REST API (Discord synced)", rawId, userId);
                 sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully\"}");
                 return;
@@ -328,11 +300,10 @@ public class TicketController implements HttpHandler {
 
         // DB-only fallback
         if (isNumeric(rawId)) {
-            ticketService.assignDeveloper(Long.parseLong(rawId), userId);
-            ticketService.updateThreadStatus(Long.parseLong(rawId), "CLAIMED");
+            facade.assignDeveloper(Long.parseLong(rawId), userId);
         } else {
-            ticketService.assignDeveloperByTicketId(rawId, userId);
-            ticketService.updateTicketStatusByTicketId(rawId, "CLAIMED");
+            facade.repository().assignDeveloperByTicketId(rawId, userId);
+            facade.repository().updateTicketStatusByTicketId(rawId, "CLAIMED");
         }
         logger.info("Ticket {} claimed by user {} (DB only)", rawId, userId);
         sendResponse(exchange, 200, "{\"message\":\"Ticket claimed successfully (DB only)\"}");
@@ -353,7 +324,7 @@ public class TicketController implements HttpHandler {
         if (thread != null && ticket != null && ticket.getClaimedBy() != null) {
             Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
             if (member != null) {
-                devCommands.performResolved(thread, member, prUrl);
+                facade.resolveTicket(thread.getIdLong(), prUrl);
                 logger.info("Ticket {} resolved with PR {} via REST API (Discord synced)", rawId, prUrl);
                 sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review\"}");
                 return;
@@ -362,16 +333,16 @@ public class TicketController implements HttpHandler {
 
         // DB-only fallback
         if (isNumeric(rawId)) {
-            ticketService.setPrUrl(Long.parseLong(rawId), prUrl);
+            facade.resolveTicket(Long.parseLong(rawId), prUrl);
         } else {
-            ticketService.setPrUrlByTicketId(rawId, prUrl);
+            facade.repository().setPrUrlByTicketId(rawId, prUrl);
         }
         logger.info("Ticket {} resolved with PR {} (DB only)", rawId, prUrl);
         sendResponse(exchange, 200, "{\"message\":\"Ticket submitted for review (DB only)\"}");
     }
 
     private void handleGetStats(HttpExchange exchange) throws IOException {
-        java.util.Map<String, Integer> stats = ticketRepository.getGlobalStats();
+        java.util.Map<String, Integer> stats = facade.repository().getGlobalStats();
         StringBuilder json = new StringBuilder("{");
         json.append("\"totalUsers\":").append(stats.getOrDefault("totalUsers", 0)).append(",");
         json.append("\"activeUsers\":").append(stats.getOrDefault("activeUsers", 0)).append(",");
@@ -390,42 +361,28 @@ public class TicketController implements HttpHandler {
         if (thread != null) {
             switch (status) {
                 case "CLOSED":
-                    generalCommands.performClosed(thread);
+                    facade.closeTicket(thread.getIdLong());
                     break;
                 case "REVIEWED":
-                    Member reviewMember = thread.getGuild().getMemberById(session.userId);
-                    if(reviewMember == null) reviewMember = thread.getGuild().retrieveMemberById(session.userId).complete();
-                    if (reviewMember != null) {
-                        qaCommands.performReviewed(thread, reviewMember);
-                    }
+                    facade.approveTicket(thread.getIdLong(), session.userId);
                     break;
                 case "OPEN":
-                    devCommands.performUnclaim(thread);
+                    facade.unclaimTicket(thread.getIdLong());
                     break;
                 case "UNRESOLVE":
-                    if (ticket != null && ticket.getClaimedBy() != null) {
-                        Member member = thread.getGuild().getMemberById(ticket.getClaimedBy());
-                        if(member == null) member = thread.getGuild().retrieveMemberById(ticket.getClaimedBy()).complete();
-                        if (member != null) {
-                            devCommands.performUnresolve(thread, member);
-                        }
-                    }
+                    facade.unresolveTicket(thread.getIdLong());
                     break;
                 case "UNREVIEW":
-                    Member unreviewMember = thread.getGuild().getMemberById(session.userId);
-                    if(unreviewMember == null) unreviewMember = thread.getGuild().retrieveMemberById(session.userId).complete();
-                    if (unreviewMember != null) {
-                        qaCommands.performUnreview(thread, unreviewMember);
-                    }
+                    facade.unreviewTicket(thread.getIdLong());
                     break;
             }
             logger.info("Ticket {} status updated to {} via REST API (Discord synced)", rawId, status);
         } else {
             // DB-only fallback
             if (isNumeric(rawId)) {
-                ticketService.updateThreadStatus(Long.parseLong(rawId), status);
+                facade.ticketService().updateThreadStatus(Long.parseLong(rawId), status);
             } else {
-                ticketService.updateTicketStatusByTicketId(rawId, status);
+                facade.repository().updateTicketStatusByTicketId(rawId, status);
             }
             logger.info("Ticket {} status updated to {} (DB only)", rawId, status);
         }
@@ -434,7 +391,7 @@ public class TicketController implements HttpHandler {
     }
 
     private void handleListFolders(HttpExchange exchange) throws IOException {
-        String ticketsDir = ticketLoader.getTicketsDir();
+        String ticketsDir = facade.loader().getTicketsDir();
         java.io.File file = new java.io.File(ticketsDir);
         String[] directories = file.list((current, name) -> new java.io.File(current, name).isDirectory());
 
@@ -454,9 +411,9 @@ public class TicketController implements HttpHandler {
      */
     private Ticket findTicket(String rawId) {
         if (isNumeric(rawId)) {
-            return ticketRepository.findTicketByThreadId(Long.parseLong(rawId));
+            return facade.getTicketByThreadId(Long.parseLong(rawId));
         } else {
-            return ticketRepository.findTicketByTicketId(rawId);
+            return facade.getTicketByTicketId(rawId);
         }
     }
 
@@ -467,14 +424,14 @@ public class TicketController implements HttpHandler {
      */
     private ThreadChannel resolveThread(Ticket ticket, String rawId) {
         if (isNumeric(rawId)) {
-            return jda.getThreadChannelById(Long.parseLong(rawId));
+            return facade.jda().getThreadChannelById(Long.parseLong(rawId));
         }
         // For UUID-based tickets, get the discord_thread_id from the ticket record
         if (ticket != null && ticket.getDiscordThreadId() != null
                 && !ticket.getDiscordThreadId().equals("null")
                 && !ticket.getDiscordThreadId().isEmpty()) {
             try {
-                return jda.getThreadChannelById(Long.parseLong(ticket.getDiscordThreadId()));
+                return facade.jda().getThreadChannelById(Long.parseLong(ticket.getDiscordThreadId()));
             } catch (NumberFormatException e) {
                 logger.warn("Invalid discordThreadId '{}' for ticket {}", ticket.getDiscordThreadId(), rawId);
             }
@@ -532,7 +489,7 @@ public class TicketController implements HttpHandler {
                     part = part.trim();
                     if (part.startsWith("sessionId=")) {
                         String sessionId = part.substring("sessionId=".length());
-                        return authService.getSession(sessionId);
+                        return facade.getSession(sessionId);
                     }
                 }
             }

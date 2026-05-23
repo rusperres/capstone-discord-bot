@@ -3,15 +3,9 @@ package org.example.api;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import net.dv8tion.jda.api.JDA;
-import org.example.commands.DevCommands;
-import org.example.commands.GeneralCommands;
-import org.example.commands.QACommands;
 import org.example.database.Classes.Ticket;
-import org.example.database.TicketRepository;
 import org.example.services.AuthService;
-import org.example.services.TicketLoader;
-import org.example.services.TicketMarkdownParser;
-import org.example.services.TicketService;
+import org.example.services.BackendFacade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -30,55 +24,46 @@ import static org.mockito.Mockito.*;
 public class TicketControllerTest {
 
     @Mock
-    private TicketService ticketService;
-
-    @Mock
-    private TicketRepository ticketRepository;
+    private BackendFacade facade;
 
     @Mock
     private JDA jda;
 
     @Mock
-    private DevCommands devCommands;
-
-    @Mock
-    private QACommands qaCommands;
-
-    @Mock
-    private GeneralCommands generalCommands;
-
-    @Mock
     private HttpExchange exchange;
-
-    @Mock
-    private AuthService authService;
-
-    @Mock
-    private TicketLoader ticketLoader;
-
-    @Mock
-    private TicketMarkdownParser ticketMarkdownParser;
 
     private TicketController ticketController;
 
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
-        ticketController = new TicketController(123L, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService, ticketLoader, ticketMarkdownParser);
+        ticketController = new TicketController(facade);
+
+        // Stub jda to avoid NPE in resolveThread; returning null channel means DB-only path is used
+        when(facade.jda()).thenReturn(jda);
+        when(jda.getThreadChannelById(anyLong())).thenReturn(null);
 
         // Mock a valid session for all tests
         Headers requestHeaders = new Headers();
         requestHeaders.add("Cookie", "sessionId=valid_session");
         when(exchange.getRequestHeaders()).thenReturn(requestHeaders);
         AuthService.UserSession mockSession = new AuthService.UserSession("123", "did", "username", "av", "token");
-        when(authService.getSession("valid_session")).thenReturn(mockSession);
+        when(facade.getSession("valid_session")).thenReturn(mockSession);
     }
 
     @Test
     public void testHandleListTickets() throws IOException {
-        Ticket ticket = new Ticket("1", "123", "Title", "Desc", "OPEN", null, null, null, "LOW", Collections.emptyList(), "2023-01-01", null);
+        Ticket ticket = new Ticket.TicketBuilder()
+                .setTicketId("1")
+                .setDiscordThreadId("123")
+                .setTitle("Title")
+                .setDescription("Desc")
+                .setStatus("OPEN")
+                .setPriority("LOW")
+                .setDateAdded("2023-01-01")
+                .build();
         List<Ticket> tickets = Collections.singletonList(ticket);
-        when(ticketRepository.getAllActiveTickets()).thenReturn(tickets);
+        when(facade.getAllActiveTickets()).thenReturn(tickets);
         when(exchange.getRequestMethod()).thenReturn("GET");
         when(exchange.getRequestURI()).thenReturn(URI.create("/api/tickets/list"));
         
@@ -95,8 +80,16 @@ public class TicketControllerTest {
 
     @Test
     public void testHandleGetTicket() throws IOException {
-        Ticket ticket = new Ticket("1", "123", "Title", "Desc", "OPEN", null, null, null, "LOW", Collections.emptyList(), "2023-01-01", null);
-        when(ticketRepository.findTicketByThreadId(123L)).thenReturn(ticket);
+        Ticket ticket = new Ticket.TicketBuilder()
+                .setTicketId("1")
+                .setDiscordThreadId("123")
+                .setTitle("Title")
+                .setDescription("Desc")
+                .setStatus("OPEN")
+                .setPriority("LOW")
+                .setDateAdded("2023-01-01")
+                .build();
+        when(facade.getTicketByThreadId(123L)).thenReturn(ticket);
         when(exchange.getRequestMethod()).thenReturn("GET");
         when(exchange.getRequestURI()).thenReturn(URI.create("/api/tickets/123"));
         
@@ -124,7 +117,7 @@ public class TicketControllerTest {
 
         ticketController.handle(exchange);
 
-        verify(ticketService).assignDeveloper(123L, 456L);
+        verify(facade).assignDeveloper(123L, 456L);
         verify(exchange).sendResponseHeaders(eq(200), anyLong());
     }
 
@@ -142,7 +135,7 @@ public class TicketControllerTest {
 
         ticketController.handle(exchange);
 
-        verify(ticketService).setPrUrl(123L, "http://github.com/pr/1");
+        verify(facade).resolveTicket(123L, "http://github.com/pr/1");
         verify(exchange).sendResponseHeaders(eq(200), anyLong());
     }
 }

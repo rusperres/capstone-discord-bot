@@ -197,7 +197,20 @@ public class TicketRepository {
         }
         return topUsers;
     }
-    /* ---------------------------------------------------------------------------------------------------------*/
+    public List<User> getAllUsers() {
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT * FROM users";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                users.add(getUser(Long.parseLong(rs.getString("user_id"))));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return users;
+    }
+/* ---------------------------------------------------------------------------------------------------------*/
 
 
     /* ---------------------------------------------- TICKET METHODS -------------------------------------------*/
@@ -254,8 +267,9 @@ public class TicketRepository {
     public boolean saveTicket(Ticket ticket) {
         String sql = """
             INSERT INTO tickets (ticket_id, discord_thread_id, title, ticket_description, 
-                                 status, priority, date_added, date_closed, pr_url) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 status, priority, date_added, date_closed, pr_url,
+                                 claimed_by, closed_by) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -271,6 +285,8 @@ public class TicketRepository {
             pstmt.setString(7, ticket.getDate_added());
             pstmt.setString(8, ticket.getDate_closed());
             pstmt.setString(9, ticket.getPrUrl());
+            pstmt.setString(10, ticket.getClaimedBy());
+            pstmt.setString(11, ticket.getClosedBy());
 
             // 1. Save the main ticket row
             boolean isSaved = pstmt.executeUpdate() > 0;
@@ -314,6 +330,30 @@ public class TicketRepository {
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, status.toUpperCase());
             pstmt.setString(2, ticketId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean updateTicketClaimedBy(long threadId, String userId) {
+        String sql = "UPDATE tickets SET claimed_by = ? WHERE discord_thread_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, userId);
+            pstmt.setString(2, String.valueOf(threadId));
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean updateTicketClosedBy(long threadId, String userId) {
+        String sql = "UPDATE tickets SET closed_by = ? WHERE discord_thread_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, userId);
+            pstmt.setString(2, String.valueOf(threadId));
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -414,7 +454,22 @@ public class TicketRepository {
         }
         return null;
     }
-
+    /**
+     * Returns a list of all tickets in the system.
+     */
+    public List<Ticket> getAllTickets() {
+        List<Ticket> tickets = new ArrayList<>();
+        String sql = "SELECT * FROM tickets";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                tickets.add(mapResultSetToTicket(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return tickets;
+    }
     /**
      * Returns a list of all tickets that aren't marked as CLOSED.
      */
@@ -546,21 +601,20 @@ public class TicketRepository {
         // 1. Fetch the list of strings for this specific ticket
         List<String> categoryNames = getCategoryNamesForTicket(currentTicketId);
 
-        return new Ticket(
-                rs.getString("ticket_id"),
-                rs.getString("discord_thread_id"),
-                rs.getString("title"),
-                rs.getString("ticket_description"),
-                rs.getString("status"),
-                rs.getString("pr_url"),
-                rs.getString("claimed_by"),
-                rs.getString("closed_by"),
-                rs.getString("priority"),
-                categoryNames,
-                rs.getString("date_added"),
-                rs.getString("date_closed")
-
-        );
+        return new Ticket.TicketBuilder()
+                .setTicketId(rs.getString("ticket_id"))
+                .setDiscordThreadId(rs.getString("discord_thread_id"))
+                .setTitle(rs.getString("title"))
+                .setDescription(rs.getString("ticket_description"))
+                .setStatus(rs.getString("status"))
+                .setPrUrl(rs.getString("pr_url"))
+                .setClaimedBy(rs.getString("claimed_by"))
+                .setClosedBy(rs.getString("closed_by"))
+                .setPriority(rs.getString("priority"))
+                .setCategories(categoryNames)
+                .setDateAdded(rs.getString("date_added"))
+                .setDateClosed(rs.getString("date_closed"))
+                .build();
     }
 
 
