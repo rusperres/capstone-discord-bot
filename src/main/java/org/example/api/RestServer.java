@@ -49,7 +49,9 @@ public class RestServer {
     }
 
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(port), 0);
+        InetSocketAddress address = new InetSocketAddress("0.0.0.0", port);
+        server = HttpServer.create(address, 0);
+        logger.info("REST Server binding to {}", address);
         
         TicketController ticketController = new TicketController(guildId, jda, ticketService, ticketRepository, devCommands, qaCommands, generalCommands, authService, ticketLoader, ticketMarkdownParser);
         UserController userController = new UserController(guildId, jda, userService, ticketRepository, generalCommands, authService);

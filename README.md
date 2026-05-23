@@ -1,6 +1,6 @@
-# 🤖 Capstone Discord Bot
+# 🤖 Capstone Backend Service (Discord Bot & REST API)
 
-A powerful Discord bot designed for project management, ticket tracking, and role-based permissions. It helps streamline the workflow between Project Managers, Developers, and QA testers.
+A powerful dual-purpose backend service designed for project management, ticket tracking, and role-based permissions. This service integrates a Discord bot for real-time interaction and a REST API for frontend applications, streamlining the workflow between Project Managers, Developers, and QA testers.
 
 ## 🚀 Getting Started
 
@@ -17,14 +17,21 @@ To build and run this project, you need the following installed:
 1.  **Clone the repository:**
     ```bash
     git clone <repository-url>
-    cd capstone-discord-bot
+    cd capstone-backend
     ```
 
 2.  **Configure environment variables:**
-    Create a `.env` file in the root directory and add your bot credentials:
+    Create a `.env` file in the root directory and add your credentials. Refer to `.env.example` for all required variables:
     ```env
+    # Discord Bot Configuration
     DISCORD_TOKEN=your_bot_token_here
     GUILD_ID=your_target_guild_id
+    TICKETS_DIR=tickets/
+
+    # OAuth2 Configuration (for REST API Auth)
+    DISCORD_CLIENT_ID=your_client_id
+    DISCORD_CLIENT_SECRET=your_client_secret
+    DISCORD_REDIRECT_URI=http://localhost:8080/api/auth/callback
     ```
 
 3.  **Build the project:**
@@ -32,16 +39,32 @@ To build and run this project, you need the following installed:
     mvn clean install
     ```
 
-4.  **Run the bot:**
+4.  **Run the service:**
     ```bash
     mvn exec:java -Dexec.mainClass="org.example.Main"
     ```
+    This will start both the Discord bot and the REST API server.
 
 ---
 
-## 📋 Roles & Permissions
+## 🌐 REST API
 
-This bot uses a strict role system where each user can hold only **one** role at a time.
+The backend exposes a REST API on port `8080` by default. This API is used by the frontend application to manage tickets, users, and authentication.
+
+### Key Endpoints
+- `GET /api/tickets` - Retrieve all tickets
+- `GET /api/stats` - Retrieve system statistics
+- `GET /api/profile` - Get current user profile
+- `POST /api/auth/login` - Authenticate user
+
+For full API documentation, including request/response formats and authentication details, please refer to:
+👉 **[API Documentation](api_documentation.md)**
+
+---
+
+## 📋 Discord Roles & Permissions
+
+This system uses a strict role system where each user can hold only **one** role at a time, synchronized between Discord and the database.
 
 ### 🔧 Project Manager (Admin)
 *   **/load-tickets** - Load tickets into channels
@@ -70,8 +93,16 @@ This bot uses a strict role system where each user can hold only **one** role at
 > **ONE role per user only.**
 > When you set a new role, your old role is automatically replaced. The Project Manager has all permissions and acts as the system administrator.
 
+---
+
+## 🗄️ Database
+The service uses a local **SQLite** database (`database.db`) to persist ticket states, user roles, and performance metrics. This database is shared between the Discord bot and the REST API.
+
+---
+
 ## 🛠️ Built With
 *   [JDA (Java Discord API)](https://github.com/discord-jda/JDA) - Discord integration
+*   [HttpServer](https://docs.oracle.com/en/java/javase/15/docs/api/jdk.httpserver/com/sun/net/httpserver/HttpServer.html) - Lightweight REST server
 *   [SQLite JDBC](https://github.com/xerial/sqlite-jdbc) - Database management
 *   [dotenv-java](https://github.com/cdimascio/dotenv-java) - Environment configuration
 *   [Commonmark](https://github.com/commonmark/commonmark-java) - Markdown parsing
