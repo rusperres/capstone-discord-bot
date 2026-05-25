@@ -36,17 +36,24 @@ To build and run this project, you need the following installed:
 
 To get a bot token:
 a.    Go to [Discord Developer Portal](https://discord.com/developers/applications)
+
 b.    Create a new application
+
 c.    Go to "Bot" section and click "Add Bot"
+
 d.    Copy the token and paste it in `.env`
 
 3. Invite Bot to Server
 
-a. In Developer Portal, go to "OAuth2" > "URL Generator"
-b. Select scopes: `bot`, `applications.commands`
-c. Select permissions: `Manage Channels`, `Manage Threads`, `Send Messages`, `Embed Links`
-d. Copy the generated URL and open it in browser
-e. Select your server and authorize
+a.    In Developer Portal, go to "OAuth2" > "URL Generator"
+
+b.    Select scopes: `bot`, `applications.commands`
+
+c.    Select permissions: `Manage Channels`, `Manage Threads`, `Send Messages`, `Embed Links`
+
+d.    Copy the generated URL and open it in browser
+
+e.    Select your server and authorize
    
 
 4.  **Build the project:**
