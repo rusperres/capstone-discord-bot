@@ -35,10 +35,10 @@ To build and run this project, you need the following installed:
     ```
 
 To get a bot token:
-a. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-b. Create a new application
-c. Go to "Bot" section and click "Add Bot"
-d. Copy the token and paste it in `.env`
+a.    Go to [Discord Developer Portal](https://discord.com/developers/applications)
+b.    Create a new application
+c.    Go to "Bot" section and click "Add Bot"
+d.    Copy the token and paste it in `.env`
 
 3. Invite Bot to Server
 
