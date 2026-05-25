@@ -14,61 +14,71 @@ To build and run this project, you need the following installed:
 
 ### Installation & Setup
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd capstone-backend
-    ```
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd capstone-backend
+   ```
 
-2.  **Configure environment variables:**
-    Create a `.env` file in the root directory and add your credentials. Refer to `.env.example` for all required variables:
-    ```env
-    # Discord Bot Configuration
-    DISCORD_TOKEN=your_bot_token_here
-    GUILD_ID=your_target_guild_id
-    TICKETS_DIR=tickets/
+2. **Configure environment variables:**
 
-    # OAuth2 Configuration (for REST API Auth)
-    DISCORD_CLIENT_ID=your_client_id
-    DISCORD_CLIENT_SECRET=your_client_secret
-    DISCORD_REDIRECT_URI=http://localhost:8080/api/auth/callback
-    ```
+   Create a `.env` file in the root directory and add your credentials.  
+   Refer to `.env.example` for all required variables:
 
-To get a bot token:
-a.    Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   ```env
+   # Discord Bot Configuration
+   DISCORD_TOKEN=your_bot_token_here
+   GUILD_ID=your_target_guild_id
+   TICKETS_DIR=tickets/
 
-b.    Create a new application
+   # OAuth2 Configuration (for REST API Auth)
+   DISCORD_CLIENT_ID=your_client_id
+   DISCORD_CLIENT_SECRET=your_client_secret
+   DISCORD_REDIRECT_URI=http://localhost:8080/api/auth/callback
+   ```
 
-c.    Go to "Bot" section and click "Add Bot"
+   **To get a bot token:**
 
-d.    Copy the token and paste it in `.env`
+   1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+   2. Create a new application
+   3. Go to the **Bot** section and click **Add Bot**
+   4. Copy the token and paste it into `.env`
 
-3. Invite Bot to Server
+3. **Invite the bot to your server:**
 
-a.    In Developer Portal, go to "OAuth2" > "URL Generator"
+   1. In the Developer Portal, go to **OAuth2 → URL Generator**
+   2. Select these scopes:
+      - `bot`
+      - `applications.commands`
 
-b.    Select scopes: `bot`, `applications.commands`
+   3. Select these permissions:
+      - `Manage Channels`
+      - `Manage Threads`
+      - `Send Messages`
+      - `Embed Links`
 
-c.    Select permissions: `Manage Channels`, `Manage Threads`, `Send Messages`, `Embed Links`
+   4. Copy the generated URL and open it in your browser
+   5. Select your server and authorize the bot
+   6. Enable all **Privileged Gateway Intents** in the **Bot** section
+   7. Add your redirect URL in the **OAuth2** section:
 
-d.    Copy the generated URL and open it in browser
+      ```txt
+      http://localhost:8000/api/auth/callback
+      ```
 
-e.    Select your server and authorize
-   
+4. **Build the project:**
+   ```bash
+   mvn clean install
+   ```
 
-4.  **Build the project:**
-    ```bash
-    mvn clean install
-    ```
+5. **Run the service:**
+   ```bash
+   mvn exec:java -Dexec.mainClass="org.example.Main"
+   ```
 
-5.  **Run the service:**
-    ```bash
-    mvn exec:java -Dexec.mainClass="org.example.Main"
-    ```
-    Or the play button in IntelliJ
-    This will start both the Discord bot and the REST API server.
+   Or use the play button in IntelliJ.
 
----
+   This will start both the Discord bot and the REST API server.
 
 ## 🌐 REST API
 
