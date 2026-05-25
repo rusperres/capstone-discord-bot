@@ -34,15 +34,31 @@ To build and run this project, you need the following installed:
     DISCORD_REDIRECT_URI=http://localhost:8080/api/auth/callback
     ```
 
-3.  **Build the project:**
+To get a bot token:
+a. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+b. Create a new application
+c. Go to "Bot" section and click "Add Bot"
+d. Copy the token and paste it in `.env`
+
+3. Invite Bot to Server
+
+a. In Developer Portal, go to "OAuth2" > "URL Generator"
+b. Select scopes: `bot`, `applications.commands`
+c. Select permissions: `Manage Channels`, `Manage Threads`, `Send Messages`, `Embed Links`
+d. Copy the generated URL and open it in browser
+e. Select your server and authorize
+   
+
+4.  **Build the project:**
     ```bash
     mvn clean install
     ```
 
-4.  **Run the service:**
+5.  **Run the service:**
     ```bash
     mvn exec:java -Dexec.mainClass="org.example.Main"
     ```
+    Or the play button in IntelliJ
     This will start both the Discord bot and the REST API server.
 
 ---
